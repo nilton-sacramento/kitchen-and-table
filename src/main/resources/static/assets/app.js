@@ -281,7 +281,7 @@ $('menu-toggle').addEventListener('click', () => {
   const open = $('sidebar').classList.toggle('open');
   $('menu-toggle').setAttribute('aria-expanded', String(open));
 });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { closeMenu(); $('menu-toggle').focus(); } });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && $('menu-toggle').getAttribute('aria-expanded') === 'true') { closeMenu(); $('menu-toggle').focus(); } });
 async function restoreSession() {
   const current = ++generation;
   $('app-view').hidden = true;

@@ -4,7 +4,7 @@ const uuidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}
 const el = (tag, text = '', className = '') => { const node = document.createElement(tag); node.textContent = text; node.className = className; return node; };
 export function createEmployeeScreen({ root, api, onExpired, getEstablishments = () => [] }) {
   let unit = null, generation = 0, capabilities = null, rows = [], requests = [], busy = false;
-  function reset() { generation++; unit = null; rows = []; requests = []; capabilities = null; busy = false; root.removeAttribute('aria-busy'); root.replaceChildren(); }
+  function reset() { generation++; unit = null; rows = []; requests = []; capabilities = null; busy = false; editorTrigger = null; root.removeAttribute('aria-busy'); root.replaceChildren(); }
   function path(suffix = '') { return `estabelecimentos/${encodeURIComponent(unit)}/funcionarios${suffix}`; }
   async function request(suffix, method = 'GET', data, key) {
     const destination = path(suffix);
@@ -12,9 +12,14 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     const csrf = await api('auth/csrf');
     return api(destination, { method, headers: { [csrf.headerName]: csrf.token, 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(data) });
   }
+  let editorTrigger = null;
+  function restoreFocus(key) {
+    const candidate = key && root.querySelector(`[data-focus="${CSS.escape(key)}"]`);
+    (candidate || root.querySelector('input[type="search"], button'))?.focus();
+  }
   function message(text, error = false) {
     const node = root.querySelector('[data-message]');
-    if (node) { node.textContent = text; node.className = error ? 'error' : 'employee-feedback'; node.hidden = !text; }
+    if (node) { node.textContent = text; node.className = error ? 'error' : 'employee-feedback'; node.hidden = !text; node.setAttribute('role', error ? 'alert' : 'status'); }
   }
   function fail(error) {
     if (error.status === 401) { reset(); onExpired(); return; }
@@ -23,6 +28,7 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
   async function run(operation, success) {
     if (busy) return;
     const current = generation;
+    const focusKey = editorTrigger || document.activeElement?.dataset.focus;
     busy = true; root.setAttribute('aria-busy', 'true'); root.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     try {
       await operation();
@@ -30,10 +36,10 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
       await load(current);
       if (current === generation) message(success);
     } catch (error) { if (current === generation) fail(error); }
-    finally { if (current === generation) { busy = false; root.removeAttribute('aria-busy'); root.querySelectorAll('button').forEach((b) => { b.disabled = false; }); } }
+    finally { if (current === generation) { busy = false; root.removeAttribute('aria-busy'); root.querySelectorAll('button').forEach((b) => { b.disabled = false; }); restoreFocus(focusKey); editorTrigger = null; } }
   }
   function button(label, action, className = 'secondary') {
-    const b = el('button', label, className); b.type = 'button'; b.addEventListener('click', action); return b;
+    const b = el('button', label, className); b.type = 'button'; b.dataset.focus = label; b.addEventListener('click', action); return b;
   }
   function input(form, name, label, value = '', { type = 'text', required = false, maxLength = 150, pattern } = {}) {
     const box = el('div'); const l = el('label', label); const field = document.createElement('input');
@@ -49,15 +55,17 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     box.append(l, field); form.append(box); return field;
   }
   function editor(title) {
+    editorTrigger = document.activeElement?.dataset.focus || null;
     const slot = root.querySelector('[data-editor]'); slot.replaceChildren(); slot.hidden = false;
-    const form = document.createElement('form'); form.className = 'employee-form';
+    const form = document.createElement('form'); form.className = 'employee-form'; form.setAttribute('aria-label', title);
     form.append(el('h3', title)); slot.append(form); return form;
   }
   function finishForm(form, action) {
     const controls = el('div', '', 'employee-actions'); const submit = el('button', 'Salvar', 'primary'); submit.type = 'submit';
-    controls.append(submit, button('Cancelar', () => { const slot = root.querySelector('[data-editor]'); slot.replaceChildren(); slot.hidden = true; })); form.append(controls);
+    controls.append(submit, button('Cancelar', () => { const slot = root.querySelector('[data-editor]'); slot.replaceChildren(); slot.hidden = true; restoreFocus(editorTrigger); editorTrigger = null; })); form.append(controls);
     form.addEventListener('submit', (event) => { event.preventDefault(); if (form.reportValidity()) action(); });
-    form.querySelector('input,select')?.focus();
+    form.querySelector('input:not(:disabled),select:not(:disabled),button')?.focus();
+    form.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); controls.querySelector('button[type=button]').click(); } });
   }
   function edit(row = null) {
     const form = editor(row ? 'Editar dados nesta unidade' : 'Cadastrar nova pessoa');
@@ -122,14 +130,18 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     if (!capabilities.consultar) root.append(el('p', 'Seu acesso não permite listar a equipe. As demais ações também são validadas no servidor.', 'muted'));
     else {
       const search = el('input'); search.type = 'search'; search.placeholder = 'Buscar por nome ou contato'; search.setAttribute('aria-label', 'Buscar funcionários'); root.append(search);
-      const wrap = el('div', '', 'employee-table-wrap'); const table = el('table', '', 'employee-table'); const thead = el('thead'); const tr = el('tr');
+      const wrap = el('div', '', 'employee-table-wrap'); const table = el('table', '', 'employee-table'); table.setAttribute('role', 'table'); table.setAttribute('aria-label', 'Funcionários desta unidade'); const thead = el('thead'); const tr = el('tr');
       ['Funcionário', 'Função', 'Contato', 'Situação', 'Ações'].forEach((text) => { const th = el('th', text); th.scope = 'col'; tr.append(th); }); thead.append(tr); const body = el('tbody'); table.append(thead, body); wrap.append(table); root.append(wrap);
       const empty = el('p', '', 'muted'); root.append(empty);
       function fill() {
         body.replaceChildren(); const term = search.value.toLocaleLowerCase('pt-BR'); const filtered = rows.filter((r) => `${r.nome} ${r.emailContato || ''} ${r.telefone || ''}`.toLocaleLowerCase('pt-BR').includes(term));
         empty.textContent = filtered.length ? '' : 'Nenhum funcionário encontrado nesta unidade.';
         for (const row of filtered) {
-          const line = el('tr'); const name = el('td'); name.append(el('strong', row.nome), el('small', `Identidade: ${row.usuarioId}`, 'employee-identity'));
+          const line = el('tr'); line.setAttribute('role', 'row'); const name = el('td');
+          const details = el('details', '', 'employee-identifiers'); const summary = el('summary', 'Identificadores');
+          summary.setAttribute('aria-label', `Identificadores de ${row.nome}`);
+          details.append(summary, el('small', `Identidade: ${row.usuarioId}`, 'employee-identity'), el('small', `Vínculo: ${row.vinculoId}`, 'employee-link-id'));
+          name.append(el('strong', row.nome), details);
           const contact = el('td'); contact.append(el('div', row.emailContato || 'Sem e-mail de contato'), el('small', row.telefone || '', 'muted'));
           const buttons = el('td'); const controls = el('div', '', 'employee-actions');
           if (capabilities.editar) { controls.append(button('Editar', () => edit(row))); controls.append(button('Função', () => changeRole(row))); }
@@ -138,7 +150,11 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
           }));
           if (capabilities.proprietario && row.funcao === 'GERENTE') controls.append(button('Limites do gerente', () => delegation(row)));
           if (capabilities.associar && row.ativo) controls.append(button('Associar a outra unidade', () => associate(row)));
-          buttons.append(controls); line.append(name, el('td', roles[row.funcao] || row.funcao), contact, el('td', row.ativo ? 'Ativo' : 'Inativo'), buttons); body.append(line);
+          controls.querySelectorAll('button').forEach((b) => { b.setAttribute('aria-label', `${b.textContent}: ${row.nome}`); b.dataset.focus = `${row.vinculoId}:${b.textContent}`; });
+          if (!controls.children.length) controls.append(el('span', 'Sem ações autorizadas', 'muted'));
+          buttons.append(controls); line.append(name, el('td', roles[row.funcao] || row.funcao), contact, el('td', row.ativo ? 'Ativo' : 'Inativo'), buttons);
+          ['Funcionário', 'Função', 'Contato', 'Situação', 'Ações'].forEach((label, index) => { line.children[index].dataset.label = label; line.children[index].setAttribute('role', 'cell'); });
+          body.append(line);
         }
       }
       search.addEventListener('input', fill); fill();

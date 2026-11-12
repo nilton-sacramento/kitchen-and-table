@@ -228,3 +228,33 @@ html{scroll-behavior:smooth}
 #employee-view h3{font-size:18px;font-weight:500}
 #employee-view>.section-heading{align-items:flex-start}
 @media(max-width:760px){#employee-view>.section-heading{align-items:start}.employee-editor{padding:18px}}
+
+/* Revisao mobile: cartoes sem esconder acoes em rolagem horizontal. */
+.employee-identifiers{margin-top:8px;font-size:12px;color:var(--muted)}
+.employee-identifiers summary{cursor:pointer;min-height:30px;display:list-item;list-style-position:inside;padding:5px 0}
+.employee-identifiers small{display:block;overflow-wrap:anywhere;font-size:11px;line-height:1.6}
+#employee-view button:focus-visible,#employee-view summary:focus-visible,#employee-view input:focus-visible,#employee-view select:focus-visible{outline:3px solid #526f35;outline-offset:3px}
+@media(max-width:600px){
+  .topbar{height:auto;min-height:82px;padding-top:12px;padding-bottom:12px;gap:12px}
+  .account{flex:1;justify-content:flex-end;gap:10px}
+  .account>div{flex:1;min-width:0}
+  .account strong{max-width:none;white-space:normal;overflow-wrap:anywhere;font-size:13px;line-height:1.4}
+  .account small{max-width:150px;line-height:1.4}
+  .account .secondary{min-height:44px}
+  #employee-view>.section-heading{gap:16px}
+  #employee-view>.section-heading h2{font-size:28px;margin-bottom:0}
+  #employee-view .employee-actions{gap:8px}
+  #employee-view .employee-actions button{font-size:13px;min-height:44px;padding:10px 12px}
+  .employee-table-wrap{overflow:visible}
+  .employee-table{display:block;min-width:0;background:transparent;font-size:14px}
+  .employee-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .employee-table tbody{display:grid;gap:16px}
+  .employee-table tbody tr{display:block;border:1px solid var(--line);border-radius:10px;background:#fff;padding:16px}
+  .employee-table td{display:block;border:0;padding:8px 0;min-width:0!important;max-width:none!important;overflow-wrap:anywhere}
+  .employee-table td::before{content:attr(data-label);display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px}
+  .employee-table td:first-child{padding-top:0}
+  .employee-table td:first-child>strong{font-size:16px;line-height:1.5}
+  .employee-table td:last-child{border-top:1px solid var(--line);padding-top:14px;margin-top:6px}
+  .employee-table .employee-actions button{flex:1 1 115px}
+  .employee-identifiers summary{min-height:44px;padding:12px 0}
+}

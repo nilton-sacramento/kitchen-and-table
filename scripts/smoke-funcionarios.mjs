@@ -45,6 +45,10 @@ async function wait(expression, description) {
   console.log('DIAGNOSTIC:', JSON.stringify(diagnostic));
   throw new Error(`Tempo esgotado: ${description}`);
 }
+async function press(key, code, windowsVirtualKeyCode) {
+  await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode, ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) });
+  await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode });
+}
 function pass(name) { console.log(`PASS: ${name}`); }
 try {
   const fixture = await ready;
@@ -84,9 +88,10 @@ try {
   await wait(`document.querySelector('.employee-table tbody')?.textContent.includes(${JSON.stringify(name)})`, 'cadastro sem contato ou senha');
   if (!(await evaluate("!window.ktXss && !document.querySelector('.employee-table script')"))) throw new Error('Renderização insegura.');
   pass('cadastro real sem e-mail/senha e renderização de nome como texto');
-  await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Editar').click();document.getElementById('employee-nome').value='Pessoa editada';document.querySelector('.employee-form').requestSubmit();true");
+  await evaluate("var b=[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Editar');b.focus();b.click();document.getElementById('employee-nome').value='Pessoa editada';document.querySelector('.employee-form').requestSubmit();true");
   await wait("document.querySelector('.employee-table tbody')?.textContent.includes('Pessoa editada')", 'edição real');
-  pass('edição com controle de versão');
+  if (!(await evaluate("document.activeElement?.textContent==='Editar'"))) throw new Error('Foco perdido após salvar edição.');
+  pass('edição com controle de versão e foco restaurado');
   await evaluate("window.confirm=()=>true;[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Desativar').click();true");
   await wait("document.querySelector('.employee-table tbody tr')?.children[3]?.textContent==='Inativo'", 'desativação');
   await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Ativar').click();true");
@@ -120,7 +125,32 @@ try {
     await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 500 });
     await pause(150);
     if (!(await evaluate('document.documentElement.scrollWidth <= window.innerWidth + 2'))) throw new Error(`Rolagem horizontal externa em ${label}.`);
-    const image = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    if (width === 360) {
+      if (!(await evaluate("getComputedStyle(document.querySelector('.employee-table')).display==='block' && document.querySelector('.employee-table-wrap').scrollWidth<=window.innerWidth && !document.querySelector('.employee-identifiers').open"))) throw new Error('Cartao mobile ou identificadores incorretos.');
+      if (!(await evaluate("[...document.querySelectorAll('.employee-table tbody button')].every(b=>{const r=b.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth && r.height>=44 && !!b.getAttribute('aria-label')})"))) throw new Error('Acoes mobile inacessiveis ou pequenas.');
+      await evaluate("document.querySelector('.employee-identifiers summary').focus();true");
+      await press('Enter', 'Enter', 13);
+      if (!(await evaluate("document.querySelector('.employee-identifiers').open"))) throw new Error('Identificadores nao abrem pelo teclado.');
+      await press('Enter', 'Enter', 13);
+      await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Editar').focus();true");
+      await press('Enter', 'Enter', 13);
+      if (!(await evaluate("document.activeElement?.id==='employee-nome'"))) throw new Error('Formulario sem foco inicial.');
+      await press('Escape', 'Escape', 27);
+      if (!(await evaluate("document.querySelector('[data-editor]').hidden && document.activeElement?.textContent==='Editar'"))) throw new Error('Escape nao devolveu foco.');
+      await press('Tab', 'Tab', 9);
+      if (!(await evaluate("document.activeElement?.textContent==='Função'"))) throw new Error('Ordem de Tab incorreta.');
+      await evaluate("document.getElementById('menu-toggle').focus();true");
+      await press('Enter', 'Enter', 13);
+      if (!(await evaluate("document.getElementById('menu-toggle').getAttribute('aria-expanded')==='true'"))) throw new Error('Menu mobile nao abriu pelo teclado.');
+      await press('Escape', 'Escape', 27);
+      if (!(await evaluate("document.getElementById('menu-toggle').getAttribute('aria-expanded')==='false' && document.activeElement.id==='menu-toggle'"))) throw new Error('Menu mobile nao fechou com foco correto.');
+      await evaluate("document.activeElement.blur();window.scrollTo({top:0,left:0,behavior:'instant'});true");
+      pass('mobile: cartoes, acoes de 44px, identificadores e teclado Enter/Tab/Escape');
+    } else if (!(await evaluate("getComputedStyle(document.querySelector('.employee-table')).display==='table'"))) throw new Error('Layout de tabela desktop/tablet alterado.');
+    await evaluate("window.scrollTo({top:0,left:0,behavior:'instant'});true");
+    await pause(150);
+    const metrics = await cdp('Page.getLayoutMetrics');
+    const image = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width, height: Math.max(height, Math.ceil(metrics.cssContentSize.height)), scale: 1 } });
     await fs.writeFile(path.join(artifacts, `${label}.png`), Buffer.from(image.data, 'base64'));
     pass(`layout sem transbordamento externo: ${label}`);
   }
