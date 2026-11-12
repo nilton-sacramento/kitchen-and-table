@@ -14,7 +14,7 @@ Permissão do token: contents: read. Checkout sem persistir credenciais. Não h�
 
 A branch de configuração parte de develop, que ainda não contém pom.xml. Por isso, somente enquanto não há backend integrado, o workflow faz um segundo checkout isolado do commit completo da feature correspondente a 04b136c em _ci/etapa-1 e o testa. Isso não copia o código para a branch nem executa merge. O resumo da execução registra bootstrap e diretório validado.
 
-Quando pom.xml existir, o checkout do evento/PR é testado diretamente. Se a ancestralidade indicar que o backend já foi integrado e pom.xml desaparecer, o job falha; não pode ocultar uma remoção de backend usando bootstrap. Após a integração do código e da configuração, remover o fallback por outro PR de manutenção autorizado.
+Quando pom.xml existir, o checkout do evento/PR é testado diretamente. Se o histórico de adição de pom.xml indicar que o backend já foi integrado (inclusive por squash/cherry-pick) e o arquivo desaparecer, o job falha; não pode ocultar uma remoção de backend usando bootstrap. Após a integração do código e da configuração, remover o fallback por outro PR de manutenção autorizado.
 
 Um CI verde de bootstrap prova aquele commit fixo da Etapa 1, não um módulo futuro nem todas as alterações de configuração. actionlint foi utilizado localmente para validar a estrutura do workflow. É necessário conferir o escopo real de cada execução antes do merge.
 

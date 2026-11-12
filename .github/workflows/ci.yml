@@ -35,8 +35,8 @@ jobs:
             echo 'directory=.' >> "$GITHUB_OUTPUT"
             echo 'bootstrap=false' >> "$GITHUB_OUTPUT"
           else
-            implementation='245f7378e9db05712750100d6d806a648501c6ae'
-            if git cat-file -e "${implementation}^{commit}" 2>/dev/null && git merge-base --is-ancestor "$implementation" HEAD; then
+            # Historico do arquivo cobre merges normais, squash e cherry-pick.
+            if [ -n "$(git log -1 --format=%H --diff-filter=A HEAD -- pom.xml)" ]; then
               echo '::error::O backend ja foi integrado e pom.xml foi removido. Bootstrap proibido.'
               exit 1
             fi
