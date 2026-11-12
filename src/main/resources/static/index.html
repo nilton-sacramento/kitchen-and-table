@@ -19,12 +19,12 @@
     </aside>
     <main class="login-main">
       <div class="login-card"><span class="eyebrow">BEM-VINDO DE VOLTA</span><h2>Seu próximo serviço<br>começa aqui.</h2><p class="muted">Entre com sua conta para acessar a gestão.</p>
-        <form id="login-form">
+        <form id="login-form" method="post" action="/api/v1/auth/login">
           <label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" placeholder="voce@estabelecimento.com.br" required maxlength="255">
           <div class="password-label"><label for="password">Senha</label><button id="show-password" type="button" class="text-button" aria-controls="password" aria-pressed="false">Mostrar senha</button></div>
           <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>
           <p id="login-error" class="error" role="alert" hidden></p>
-          <button id="login-submit" class="primary" type="submit">Entrar na minha conta <span aria-hidden="true">↗</span></button>
+          <button id="login-submit" class="primary" type="submit" disabled>Entrar na minha conta <span aria-hidden="true">↗</span></button>
           <p id="login-status" class="muted small" role="status"></p>
         </form>
         <p class="login-note">Utilize o e-mail e a senha já cadastrados para o seu acesso.</p>
@@ -41,7 +41,7 @@
     <div class="workspace">
       <header class="topbar"><div class="topbar-start"><button id="menu-toggle" class="icon-button mobile-only" aria-label="Abrir navegação" aria-controls="sidebar" aria-expanded="false">☰</button><span class="topbar-label">Seu espaço de gestão</span></div><div class="account"><span id="avatar" class="avatar" aria-hidden="true"></span><div><strong id="account-name"></strong><small id="account-email"></small></div><button id="logout" class="secondary">Sair</button></div></header>
       <main id="main-content" tabindex="-1">
-        <div class="page-heading"><div><span class="eyebrow">KITCHEN & TABLE / <span id="breadcrumb">VISÃO GERAL</span></span><h1 id="page-title">Visão geral</h1><p id="page-description" class="muted">Seu estabelecimento, no centro da gestão.</p></div><span class="phase-badge">ACESSO INICIAL</span></div>
+        <div class="page-heading"><div><span class="eyebrow">KITCHEN & TABLE / <span id="breadcrumb">VISÃO GERAL</span></span><h1 id="page-title">Visão geral</h1><p id="page-description" class="muted">Seu estabelecimento, no centro da gestão.</p></div><span id="page-phase" class="phase-badge">ACESSO INICIAL</span></div>
         <section class="establishment-panel" aria-labelledby="establishment-title"><div class="section-icon" aria-hidden="true">⌂</div><div class="establishment-copy"><span class="eyebrow" id="establishment-title">ESTABELECIMENTO EM OPERAÇÃO</span><strong id="establishment-name">Carregando estabelecimentos…</strong><span id="establishment-role" class="muted small"></span></div><div id="selector-wrap" hidden><label for="establishment-select" class="small">Selecionar estabelecimento</label><select id="establishment-select"></select></div></section>
         <div id="data-status" role="status" class="data-status" hidden></div><div id="data-error" class="error data-error" role="alert" hidden><p id="data-error-text"></p><button id="retry" class="secondary">Tentar novamente</button></div>
         <section id="dashboard">
@@ -49,6 +49,7 @@
           <section class="user-section" aria-labelledby="user-title"><div><span class="eyebrow">SEU ACESSO</span><h2 id="user-title">Conta autenticada</h2></div><dl><div><dt>Nome</dt><dd id="user-name"></dd></div><div><dt>E-mail</dt><dd id="user-email"></dd></div><div><dt>Função no estabelecimento</dt><dd id="user-role">—</dd></div></dl></section>
           <section id="modules" aria-labelledby="modules-title"><div class="section-heading"><div><span class="eyebrow">UMA OPERAÇÃO INTEGRADA</span><h2 id="modules-title">Tudo no seu lugar.</h2></div><span class="muted small">Módulos em desenvolvimento</span></div><div id="module-grid" class="module-grid"></div></section>
         </section>
+        <section id="employee-view" hidden aria-label="Gestão de funcionários"></section>
         <section id="module-view" class="module-placeholder" hidden><span id="module-symbol" class="section-icon" aria-hidden="true"></span><span class="phase-badge">EM DESENVOLVIMENTO</span><h2 id="module-title"></h2><p id="module-description" class="muted"></p><p>As operações deste módulo ainda não estão disponíveis.</p><button id="back-dashboard" class="primary">Voltar à visão geral</button></section>
         <footer class="workspace-footer">KITCHEN & TABLE 2.0 <span>Gestão com cuidado, em cada detalhe.</span></footer>
       </main>
