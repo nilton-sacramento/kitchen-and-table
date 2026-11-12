@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#183e35">
+  <meta name="description" content="KITCHEN & TABLE — gestão do seu estabelecimento.">
+  <title>KITCHEN & TABLE | Gestão</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <div id="login-view" class="login-layout">
+    <aside class="welcome">
+      <a class="brand" href="/" aria-label="Kitchen & Table, início"><span class="brand-icon" aria-hidden="true">k<span>t</span></span><span>KITCHEN <i>&</i> TABLE<small>GESTÃO PARA QUEM SERVE BEM</small></span></a>
+      <div class="welcome-copy"><span class="eyebrow">SUA OPERAÇÃO, MAIS CONECTADA</span><h1>Mais tempo para<br>o que você faz<br><em>de melhor.</em></h1><p>Um espaço para organizar sua gestão e cuidar de cada detalhe do seu estabelecimento.</p></div>
+      <div class="table-art" aria-hidden="true"><div class="plate"><div></div></div><span class="fork">Ⅲ</span><span class="glass"></span><span class="leaf leaf-one"></span><span class="leaf leaf-two"></span></div>
+      <footer>KITCHEN & TABLE <span>2.0</span></footer>
+    </aside>
+    <main class="login-main">
+      <div class="login-card"><span class="eyebrow">BEM-VINDO DE VOLTA</span><h2>Seu próximo serviço<br>começa aqui.</h2><p class="muted">Entre com sua conta para acessar a gestão.</p>
+        <form id="login-form">
+          <label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" placeholder="voce@estabelecimento.com.br" required maxlength="255">
+          <div class="password-label"><label for="password">Senha</label><button id="show-password" type="button" class="text-button" aria-controls="password" aria-pressed="false">Mostrar senha</button></div>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>
+          <p id="login-error" class="error" role="alert" hidden></p>
+          <button id="login-submit" class="primary" type="submit">Entrar na minha conta <span aria-hidden="true">↗</span></button>
+          <p id="login-status" class="muted small" role="status"></p>
+        </form>
+        <p class="login-note">Utilize o e-mail e a senha já cadastrados para o seu acesso.</p>
+      </div>
+      <footer class="login-footer">Uma boa gestão faz parte da receita.</footer>
+    </main>
+  </div>
+  <div id="app-view" class="app-layout" hidden>
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="/" aria-label="Kitchen & Table, início"><span class="brand-icon" aria-hidden="true">k<span>t</span></span><span>KITCHEN <i>&</i> TABLE<small>PAINEL DE GESTÃO</small></span></a>
+      <p class="nav-caption">VISÃO GERAL</p><nav id="navigation" aria-label="Navegação principal"></nav>
+      <div class="sidebar-note"><span class="status-dot"></span> Em construção contínua<small>Uma base para cada etapa da sua gestão.</small></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><div class="topbar-start"><button id="menu-toggle" class="icon-button mobile-only" aria-label="Abrir navegação" aria-controls="sidebar" aria-expanded="false">☰</button><span class="topbar-label">Seu espaço de gestão</span></div><div class="account"><span id="avatar" class="avatar" aria-hidden="true"></span><div><strong id="account-name"></strong><small id="account-email"></small></div><button id="logout" class="secondary">Sair</button></div></header>
+      <main id="main-content" tabindex="-1">
+        <div class="page-heading"><div><span class="eyebrow">KITCHEN & TABLE / <span id="breadcrumb">VISÃO GERAL</span></span><h1 id="page-title">Visão geral</h1><p id="page-description" class="muted">Seu estabelecimento, no centro da gestão.</p></div><span class="phase-badge">ACESSO INICIAL</span></div>
+        <section class="establishment-panel" aria-labelledby="establishment-title"><div class="section-icon" aria-hidden="true">⌂</div><div class="establishment-copy"><span class="eyebrow" id="establishment-title">ESTABELECIMENTO EM OPERAÇÃO</span><strong id="establishment-name">Carregando estabelecimentos…</strong><span id="establishment-role" class="muted small"></span></div><div id="selector-wrap" hidden><label for="establishment-select" class="small">Selecionar estabelecimento</label><select id="establishment-select"></select></div></section>
+        <div id="data-status" role="status" class="data-status" hidden></div><div id="data-error" class="error data-error" role="alert" hidden><p id="data-error-text"></p><button id="retry" class="secondary">Tentar novamente</button></div>
+        <section id="dashboard">
+          <div class="intro-panel"><div><span class="eyebrow">BOM TER VOCÊ POR AQUI</span><h2>Vamos preparar<br>uma boa gestão.</h2><p>Seu acesso é o primeiro passo. Os módulos operacionais serão disponibilizados em próximas etapas.</p><a href="#modules" class="intro-link">Conheça os módulos <span aria-hidden="true">↓</span></a></div><div class="intro-symbol" aria-hidden="true">k<span>&</span>t</div></div>
+          <section class="user-section" aria-labelledby="user-title"><div><span class="eyebrow">SEU ACESSO</span><h2 id="user-title">Conta autenticada</h2></div><dl><div><dt>Nome</dt><dd id="user-name"></dd></div><div><dt>E-mail</dt><dd id="user-email"></dd></div><div><dt>Função no estabelecimento</dt><dd id="user-role">—</dd></div></dl></section>
+          <section id="modules" aria-labelledby="modules-title"><div class="section-heading"><div><span class="eyebrow">UMA OPERAÇÃO INTEGRADA</span><h2 id="modules-title">Tudo no seu lugar.</h2></div><span class="muted small">Módulos em desenvolvimento</span></div><div id="module-grid" class="module-grid"></div></section>
+        </section>
+        <section id="module-view" class="module-placeholder" hidden><span id="module-symbol" class="section-icon" aria-hidden="true"></span><span class="phase-badge">EM DESENVOLVIMENTO</span><h2 id="module-title"></h2><p id="module-description" class="muted"></p><p>As operações deste módulo ainda não estão disponíveis.</p><button id="back-dashboard" class="primary">Voltar à visão geral</button></section>
+        <footer class="workspace-footer">KITCHEN & TABLE 2.0 <span>Gestão com cuidado, em cada detalhe.</span></footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

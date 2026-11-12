@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/kitchen_table}
+    username: ${DB_USER:kitchen_table}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: true
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${PORT:8080}
+  servlet:
+    session:
+      timeout: ${KT_SESSION_TIMEOUT:30m}
+      tracking-modes: cookie
+      cookie:
+        http-only: true
+        secure: ${KT_COOKIE_SECURE:false}
+        same-site: lax
