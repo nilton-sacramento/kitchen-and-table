@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [main, develop, 'feature/**', 'fix/**', 'chore/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Java 17 e JavaScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout do commit exato do evento
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Conferir identidade e integridade do checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          test -f pom.xml
+          test -f src/main/resources/static/assets/app.js
+          echo "Commit a validar: ${actual_sha}"
+
+      - name: Java 17
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      - name: Node para verificar JavaScript
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Sintaxe JavaScript
+        run: node --check src/main/resources/static/assets/app.js
+
+      - name: Compilacao, testes e empacotamento
+        run: mvn --batch-mode --no-transfer-progress -Ddebug=false -Dlogging.level.org.springframework=INFO verify
+
+      - name: Registrar commit efetivamente validado
+        if: success()
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          {
+            echo '## CI: Java 17 e JavaScript'
+            echo 'Bootstrap: false; sem dependencia de commit fixo da aplicacao.'
+            echo "Commit solicitado: ${EXPECTED_SHA}"
+            echo "Commit validado: ${actual_sha}"
+            echo 'JavaScript e Maven verify aprovados, sem desativar testes ou acessar banco externo.'
+          } >> "$GITHUB_STEP_SUMMARY"
