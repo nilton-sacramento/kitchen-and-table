@@ -49,6 +49,7 @@ class FuncionariosPostgresTest {
         jdbc.update("INSERT INTO usuarios_estabelecimentos(id,usuario_id,estabelecimento_id,funcao_id) SELECT ?,?,?,id FROM funcoes WHERE codigo='PROPRIETARIO'",LEGACY_LINK,LEGACY_USER,LEGACY_UNIT);
         props.add("spring.datasource.url",PG::getJdbcUrl);props.add("spring.datasource.username",PG::getUsername);props.add("spring.datasource.password",PG::getPassword);
     }
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
@@ -264,5 +265,123 @@ class FuncionariosPostgresTest {
     @Test void assetNovoPublicoSemLiberarApi() throws Exception {
         mvc.perform(get("/assets/funcionarios.js")).andExpect(status().isOk());
         mvc.perform(get(path(a)+"/capacidades")).andExpect(status().isUnauthorized());
+    }
+    // Segura a transacao da primeira operacao e observa o bloqueio real da segunda no PostgreSQL.
+    List<Integer> serializadas(Runnable primeira,Runnable segunda) throws Exception {
+        var pool=Executors.newFixedThreadPool(2);var aplicada=new CountDownLatch(1);var liberar=new CountDownLatch(1);
+        var pid=new CompletableFuture<Integer>();
+        try {
+            var x=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactions).execute(tx->{
+                primeira.run();aplicada.countDown();
+                try { if(!liberar.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("Barreira excedida"); }
+                catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                return 200;
+            }));
+            assertTrue(aplicada.await(5,TimeUnit.SECONDS));
+            var y=pool.submit(()->statusOf(()->new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx->{
+                pid.complete(jdbc.queryForObject("SELECT pg_backend_pid()",Integer.class));segunda.run();
+            })));
+            int backend=pid.get(5,TimeUnit.SECONDS);boolean bloqueada=false;
+            for(int i=0;i<100;i++) {
+                if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT cardinality(pg_blocking_pids(?))>0",Boolean.class,backend))){bloqueada=true;break;}
+                Thread.sleep(20);
+            }
+            assertTrue(bloqueada,"A segunda mutacao deve aguardar o lock da primeira");
+            liberar.countDown();return List.of(x.get(10,TimeUnit.SECONDS),y.get(10,TimeUnit.SECONDS));
+        } finally {liberar.countDown();pool.shutdownNow();}
+    }
+    @Test void leiturasNaoAguardamLockDeMutacaoDaUnidade() throws Exception {
+        var pessoa=create(a,"Antes do commit","ATENDENTE");grant(true);
+        UUID incoming=request(b,a,id(create(b,"Recebida","ATENDENTE")),ownerEmail);
+        var pool=Executors.newFixedThreadPool(2);var aplicada=new CountDownLatch(1);var liberar=new CountDownLatch(1);
+        try {
+            var writer=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx->{
+                service.editar(a,id(pessoa),ownerEmail,new Edicao("Depois do commit",null,null,0L));aplicada.countDown();
+                try {if(!liberar.await(10,TimeUnit.SECONDS)) throw new IllegalStateException("Barreira excedida");}
+                catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+            }));
+            assertTrue(aplicada.await(5,TimeUnit.SECONDS));
+            var reader=pool.submit(()->{
+                assertTrue(service.capacidades(a,ownerEmail).proprietario());
+                assertTrue(service.listar(a,ownerEmail).stream().anyMatch(f->f.nome().equals("Antes do commit")));
+                assertEquals("Antes do commit",service.consultar(a,id(pessoa),ownerEmail).nome());
+                assertTrue(service.consultarDelegacao(a,managerLink,ownerEmail).consultar());
+                assertTrue(associacoes.listar(a,ownerEmail).stream().anyMatch(r->r.id().equals(incoming)));
+            });
+            reader.get(3,TimeUnit.SECONDS); // FOR UPDATE faria este timeout falhar.
+            liberar.countDown();writer.get(5,TimeUnit.SECONDS);
+            assertEquals("Depois do commit",service.consultar(a,id(pessoa),ownerEmail).nome());
+        } finally {liberar.countDown();pool.shutdownNow();}
+    }
+    @Test void leiturasRevalidamUnidadeEVinculoSemLock() throws Exception {
+        grant(true);service.situacao(a,managerLink,ownerEmail,new Situacao(false,1L));
+        assertEquals(403,statusOf(()->service.listar(a,managerEmail)));
+        assertEquals(403,statusOf(()->associacoes.listar(a,managerEmail)));
+        jdbc.update("UPDATE estabelecimentos SET ativo=false WHERE id=?",a);
+        assertEquals(404,statusOf(()->service.capacidades(a,ownerEmail)));
+        assertEquals(404,statusOf(()->service.consultarDelegacao(a,managerLink,ownerEmail)));
+        assertEquals(404,statusOf(()->associacoes.listar(a,ownerEmail)));
+    }
+    UUID gerenteDestino() {
+        UUID local=link(manager,b,"GERENTE");
+        service.delegar(b,local,ownerEmail,new Delegacao(true,false,false,false,false,true,List.of("ATENDENTE"),0L));return local;
+    }
+    void revogar(UUID unidade,UUID vinculo) {
+        service.delegar(unidade,vinculo,ownerEmail,new Delegacao(false,false,false,false,false,false,List.of(),1L));
+    }
+    void semAceite(UUID req,UUID pessoa) {
+        assertNull(jdbc.queryForObject("SELECT consumida_em FROM associacoes_funcionarios WHERE id=?",java.sql.Timestamp.class,req));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM usuarios_estabelecimentos WHERE usuario_id=? AND estabelecimento_id=?",Integer.class,pessoa,b));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='ASSOCIACAO_ACEITA'",Integer.class,b));
+    }
+    @Test void revogacaoNoDestinoImpedeAceiteComSessaoExistente() throws Exception {
+        UUID gerente=gerenteDestino();var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),ownerEmail);
+        assertEquals(1,associacoes.listar(b,managerEmail).size());revogar(b,gerente);
+        mvc.perform(post(path(b)+"/associacoes/"+req+"/aceitar").session(managerSession).with(csrf()).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(json.writeValueAsBytes(new Aceite("ATENDENTE")))).andExpect(status().isForbidden());
+        assertEquals(403,statusOf(()->associacoes.listar(b,managerEmail)));semAceite(req,UUID.fromString(pessoa.get("usuarioId").asText()));
+    }
+    @Test void revogacaoOrigemPrimeiroSerializaEImpedeAceite() throws Exception {
+        grant(true);var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),managerEmail);
+        assertEquals(List.of(200,409),serializadas(()->revogar(a,managerLink),()->associacoes.aceitar(b,req,ownerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
+        semAceite(req,UUID.fromString(pessoa.get("usuarioId").asText()));
+    }
+    @Test void aceitePrimeiroSerializaRevogacaoDaOrigemSemApagarVinculo() throws Exception {
+        grant(true);var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),managerEmail);
+        assertEquals(List.of(200,200),serializadas(()->associacoes.aceitar(b,req,ownerEmail,UUID.randomUUID(),new Aceite("ATENDENTE")),()->revogar(a,managerLink)));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM usuarios_estabelecimentos WHERE usuario_id=? AND estabelecimento_id=?",Integer.class,UUID.fromString(pessoa.get("usuarioId").asText()),b));
+        assertEquals(403,statusOf(()->request(a,c,id(pessoa),managerEmail)));
+    }
+    @Test void revogacaoDestinoPrimeiroRevalidaAposLock() throws Exception {
+        UUID gerente=gerenteDestino();var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),ownerEmail);
+        assertEquals(List.of(200,403),serializadas(()->revogar(b,gerente),()->associacoes.aceitar(b,req,managerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
+        semAceite(req,UUID.fromString(pessoa.get("usuarioId").asText()));
+    }
+    @Test void aceitePrimeiroSerializaRevogacaoDoDestino() throws Exception {
+        UUID gerente=gerenteDestino();var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),ownerEmail);
+        assertEquals(List.of(200,200),serializadas(()->associacoes.aceitar(b,req,managerEmail,UUID.randomUUID(),new Aceite("ATENDENTE")),()->revogar(b,gerente)));
+        assertEquals(403,statusOf(()->associacoes.aceitar(b,req,managerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='ASSOCIACAO_ACEITA'",Integer.class,b));
+    }
+    @Test void expiracaoNaoListaNemConsomeOuAuditaAceite() throws Exception {
+        var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),ownerEmail);
+        jdbc.update("UPDATE associacoes_funcionarios SET criado_em=clock_timestamp()-interval '2 hour',expira_em=clock_timestamp()-interval '1 hour' WHERE id=?",req);
+        assertTrue(associacoes.listar(b,ownerEmail).isEmpty());
+        assertEquals(409,statusOf(()->associacoes.aceitar(b,req,ownerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
+        semAceite(req,UUID.fromString(pessoa.get("usuarioId").asText()));
+    }
+    @Test void solicitacaoNaoVazaEmOutraUnidadeNemAceitaMesmoComIdConhecido() throws Exception {
+        var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),ownerEmail);
+        assertTrue(associacoes.listar(c,ownerEmail).isEmpty());
+        assertEquals(404,statusOf(()->associacoes.aceitar(c,req,ownerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
+        assertEquals(403,statusOf(()->associacoes.aceitar(b,req,managerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
+        semAceite(req,UUID.fromString(pessoa.get("usuarioId").asText()));
+    }
+    @Test void replayConsumidoRevalidaAutorizacaoSemDuplicarAuditoria() throws Exception {
+        UUID gerente=gerenteDestino();var pessoa=create(a,"Pessoa","ATENDENTE");UUID req=request(a,b,id(pessoa),ownerEmail),key=UUID.randomUUID();
+        associacoes.aceitar(b,req,managerEmail,key,new Aceite("ATENDENTE"));revogar(b,gerente);
+        assertEquals(403,statusOf(()->associacoes.aceitar(b,req,managerEmail,key,new Aceite("ATENDENTE"))));
+        assertEquals(409,statusOf(()->associacoes.aceitar(b,req,ownerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
+        assertTrue(associacoes.listar(b,ownerEmail).isEmpty());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='ASSOCIACAO_ACEITA'",Integer.class,b));
     }
 }
