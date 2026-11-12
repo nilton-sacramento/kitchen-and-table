@@ -17,6 +17,11 @@ public class FuncionarioRepository {
     static ResponseStatusException erro(HttpStatus status, String message) {
         return new ResponseStatusException(status,message);
     }
+    // Leituras usam snapshot consistente, sem row lock; mutacoes mantem FOR UPDATE.
+    void validarUnidade(UUID id) {
+        Boolean ativa=jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM estabelecimentos WHERE id=? AND ativo=true)",Boolean.class,id);
+        if(!Boolean.TRUE.equals(ativa)) throw erro(HttpStatus.NOT_FOUND,"Estabelecimento indisponível");
+    }
     void bloquearUnidades(UUID... ids) {
         for (UUID id : new TreeSet<>(Arrays.asList(ids))) {
             var rows=jdbc.query("SELECT id FROM estabelecimentos WHERE id=? AND ativo=true FOR UPDATE",

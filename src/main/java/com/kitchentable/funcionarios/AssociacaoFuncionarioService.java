@@ -5,6 +5,7 @@ import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import static com.kitchentable.funcionarios.FuncionarioDtos.*;
@@ -48,8 +49,9 @@ public class AssociacaoFuncionarioService {
         audit.registrar(origem,ator.pessoa().id(),ator.pessoa().vinculo(),"ASSOCIACAO_SOLICITADA",vinculo,null,Map.of("solicitacaoId",id,"destinoId",dto.destinoId(),"expiraEm",expira));
         return new Associacao(id,origem,dto.destinoId(),target.nome(),expira);
     }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public List<Associacao> listar(UUID destino,String email) {
-        repo.bloquearUnidades(destino);var ator=auth.carregar(destino,email);auth.exigir(ator,"associar");
+        repo.validarUnidade(destino);var ator=auth.carregar(destino,email);auth.exigir(ator,"associar");
         var rows=repo.jdbc().query("SELECT a.id,a.origem_id,a.expira_em,COALESCE(ue.nome_exibicao,u.nome) nome,f.codigo FROM associacoes_funcionarios a " +
             "JOIN usuarios u ON u.id=a.usuario_id JOIN usuarios_estabelecimentos ue ON ue.id=a.vinculo_origem_id " +
             "JOIN funcoes f ON f.id=ue.funcao_id JOIN estabelecimentos e ON e.id=a.origem_id " +

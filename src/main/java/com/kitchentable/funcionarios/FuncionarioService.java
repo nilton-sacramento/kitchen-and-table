@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.http.HttpStatus;
 import static com.kitchentable.funcionarios.FuncionarioDtos.*;
 import static com.kitchentable.funcionarios.FuncionarioRepository.*;
@@ -26,15 +27,18 @@ public class FuncionarioService {
     private void evento(UUID unidade,AutorizacaoAdministrativaService.Administrador ator,String tipo,UUID alvo,Object antes,Object depois) {
         audit.registrar(unidade,ator.pessoa().id(),ator.pessoa().vinculo(),tipo,alvo,antes,depois);
     }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Capacidades capacidades(UUID unidade,String email) {
-        repo.bloquearUnidades(unidade);return auth.capacidades(auth.carregar(unidade,email));
+        repo.validarUnidade(unidade);return auth.capacidades(auth.carregar(unidade,email));
     }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public List<Funcionario> listar(UUID unidade,String email) {
-        var ator=iniciar(unidade,email,"consultar");
+        repo.validarUnidade(unidade);var ator=auth.carregar(unidade,email);auth.exigir(ator,"consultar");
         return repo.listar(unidade).stream().filter(f->ator.proprietario() || (AutorizacaoAdministrativaService.COMUNS.contains(f.funcao()) && ator.delegacao().funcoes().contains(f.funcao()))).toList();
     }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Funcionario consultar(UUID unidade,UUID vinculo,String email) {
-        var ator=iniciar(unidade,email,"consultar");var target=repo.buscar(unidade,vinculo);auth.alvo(ator,target);return target;
+        repo.validarUnidade(unidade);var ator=auth.carregar(unidade,email);auth.exigir(ator,"consultar");var target=repo.buscar(unidade,vinculo);auth.alvo(ator,target);return target;
     }
     private String resumo(Object body) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(body))); }
@@ -77,8 +81,9 @@ public class FuncionarioService {
         repo.funcao(unidade,vinculo,dto.funcao());var depois=repo.buscar(unidade,vinculo);
         evento(unidade,ator,"FUNCAO_PRINCIPAL_ALTERADA",vinculo,Map.of("cadastro",antes,"delegacao",delegacaoAntes),depois);return depois;
     }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Delegacao consultarDelegacao(UUID unidade,UUID vinculo,String email) {
-        var ator=iniciar(unidade,email,"consultar");auth.somenteProprietario(ator);var target=repo.buscar(unidade,vinculo);
+        repo.validarUnidade(unidade);var ator=auth.carregar(unidade,email);auth.exigir(ator,"consultar");auth.somenteProprietario(ator);var target=repo.buscar(unidade,vinculo);
         if(!target.funcao().equals("GERENTE")) throw erro(HttpStatus.BAD_REQUEST,"Delegação disponível somente para gerente");
         return repo.delegacao(vinculo,target.versao());
     }
