@@ -1,37 +1,74 @@
-# ?? KITCHEN & TABLE | Real-Time Restaurant Management & KDS System
+# KITCHEN & TABLE 2.0
 
-> **Connecting the Kitchen to the Table with Speed, Resilience, and Precision.**
+SaaS de gestão para restaurantes, bares e lanchonetes, em desenvolvimento por etapas.
 
-O **KITCHEN & TABLE** � uma plataforma SaaS PWA de alta performance desenvolvida para eliminar gargalos operacionais em bares e restaurantes, integrando gar�ons, cozinha e gest�o financeira em tempo real.
+A Etapa 1 implementa a interface inicial e a autenticação por sessão. Os módulos operacionais ainda não estão implementados. Não é uma versão pronta para produção.
 
----
+## Arquitetura implementada
 
-## ?? Principais Recursos
-- **Offline-First (PWA):** Resili�ncia total contra falhas de Wi-Fi via IndexedDB com sincroniza��o autom�tica.
-- **Setoriza��o Inteligente (Bar x Cozinha):** Encaminhamento autom�tico de pedidos para o destino correto.
-- **Alertas Reativos em Tempo Real:** Comunica��o bidirecional via WebSockets (pedidos prontos e alertas de tempo limite).
-- **Divis�o de Comanda & Pr�-Conta:** Suporte a rateio flex�vel, consumo individual e inclus�o opcional de taxa de servi�o (10%).
-- **Gest�o de Caixa & Financial Analytics:** Abertura/fechamento di�rio de caixa e pain�is de faturamento (Dia, M�s e Ano).
+- Java 17, Spring Boot 3.3.13 e Maven.
+- Spring Security com sessão HTTP, CSRF e BCrypt.
+- PostgreSQL 16, JdbcTemplate/JDBC e migrações Flyway.
+- Frontend HTML, CSS responsivo e JavaScript nativo em `src/main/resources/static`, servido pela mesma aplicação.
+- Docker Compose somente para o PostgreSQL local.
 
----
+Angular, JWT, JPA, WebSockets e operação offline não fazem parte desta implementação. O texto anterior de planejamento foi preservado integralmente em [docs/README-planejamento-original.md](docs/README-planejamento-original.md); não representa o estado atual nem substitui as decisões de negócio aprovadas. [docs/prompt-master.md](docs/prompt-master.md) foi preservado como recebido, mas está vazio.
 
-## ??? Arquitetura e Tecnologias
+## Funcionalidades disponíveis
 
-### Backend
-- **Linguagem / Framework:** Java 17+ / Spring Boot 3+
-- **Seguran�a & Dados:** Spring Security (JWT / PIN) & Spring Data JPA
-- **Tempo Real:** Spring WebSocket (STOMP / SockJS)
-- **Banco de Dados:** PostgreSQL 15+
+- Login com usuário existente; identificação de nome, e-mail, estabelecimento e função.
+- Dashboard com dados reais da API, sem indicadores fictícios.
+- Consulta e seleção de estabelecimentos vinculados.
+- Permanência da sessão após F5, logout com invalidação no servidor e expiração por inatividade.
+- Cookie HttpOnly/SameSite=Lax, CSRF no login/logout e HTTP Basic desabilitado.
+- Navegação para módulos futuros, sinalizados como em desenvolvimento.
 
-### Frontend
-- **Framework:** Angular 17+ (PWA & Standalone Components)
-- **Estiliza��o:** Tailwind CSS (Mobile-First)
-- **Estado Reativo:** RxJS
+Permissões granulares, funcionários, produtos, mesas, comandas, pedidos, cozinha, bar, estoque, caixa e relatórios continuam pendentes. A função exibida no painel não equivale a autorização granular implementada.
 
----
+## Executar localmente no Windows
 
-## ?? Estrutura do Reposit�rio
-- /backend: API RESTful e WebSockets em Spring Boot.
-- /frontend: Aplica��o reativa PWA em Angular.
-- /database: Schemas e migra��es SQL do PostgreSQL.
-- /docs: Documenta��o t�cnica e especifica��o do Prompt Master.
+Pré-requisitos: Java 17, Maven e Docker Desktop. Na raiz do clone, em PowerShell, configure `DB_PASSWORD` com a senha do banco que será utilizado. Para evitar gravá-la no histórico, use entrada oculta:
+
+```powershell
+$senhaBancoLocal = Read-Host 'Senha do PostgreSQL local' -AsSecureString
+$env:DB_PASSWORD = [System.Net.NetworkCredential]::new('', $senhaBancoLocal).Password
+mvn spring-boot:run
+```
+
+Abra http://localhost:8080. A aplicação fica vinculada a 127.0.0.1 por padrão. Não há publicação da aplicação na internet neste procedimento.
+
+**Banco já existente:** mantenha o contêiner original em execução e use a mesma senha e endereço. Não execute setup novamente. Não suba outro banco do clone: Compose pode criar outro volume por causa do nome diferente da pasta. `DB_URL` e `DB_USER` podem ser informados no mesmo terminal quando necessário. Nenhum comando aqui muda a senha do banco existente.
+
+**Instalação realmente nova:** depois de configurar DB_PASSWORD, `docker compose up -d db` cria o banco local. O setup único é descrito em [docs/configuracao-inicial.md](docs/configuracao-inicial.md). Não o execute para o proprietário já cadastrado.
+
+Não há senha padrão do banco no código. Um arquivo .env do Compose não é carregado automaticamente pelo Spring Boot. Nunca envie senhas, chaves de setup, arquivos .env, dumps ou volumes ao GitHub.
+
+## Testes
+
+```powershell
+mvn test
+```
+
+Os testes não conectam ao PostgreSQL. A expiração usa Tomcat real em porta aleatória de loopback e timeout de dois segundos somente no contexto de teste; o prazo normal permanece 30 minutos.
+
+Para executar somente a expiração:
+
+```powershell
+mvn '-Dtest=SessionInactivityIntegrationTest' test
+```
+
+O frontend não exige Node para executar. Com Node instalado, `node --check src/main/resources/static/assets/app.js` verifica a sintaxe.
+
+## Segurança e limites
+
+Sessões estão na memória do servidor e se encerram ao reiniciar. Antes de produção será necessário revisar HTTPS, cookie Secure (`KT_COOKIE_SECURE=true` em HTTPS), infraestrutura, atualizações de dependências, permissões por estabelecimento, revogação de sessões e proteção contra tentativas repetidas. O HTTP local usa cookie sem Secure por necessidade de desenvolvimento.
+
+Senhas nos testes são fictícias e usadas exclusivamente com dependências simuladas. Não representam contas operacionais. A exceção de CSRF do setup permanece limitada ao endpoint protegido pela chave externa e pelo bloqueio de inicialização única; a interface não utiliza esse endpoint.
+
+## Documentação e versionamento
+
+- [Autenticação por sessão](docs/autenticacao-sessao.md)
+- [Situação da Etapa 1 e evidências](docs/etapa-1.md)
+- [Fluxo de branches e propostas de PR](docs/fluxo-publicacao.md)
+
+Fluxo: `feature/etapa-1-autenticacao` → `develop` → `main`. Publicação exige autorização; merges não são automáticos. A publicação do código no GitHub não é implantação do SaaS.

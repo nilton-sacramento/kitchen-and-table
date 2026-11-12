@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [develop, main]
   push:
-    branches: [develop, 'feature/**', 'fix/**', 'chore/**']
+    branches: [main, develop, 'feature/**', 'fix/**', 'chore/**']
   workflow_dispatch:
 
 permissions:
@@ -20,44 +20,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout da alteracao
+      - name: Checkout do commit exato do evento
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
           persist-credentials: false
 
-      - name: Selecionar codigo a validar
-        id: source
+      - name: Conferir identidade e integridade do checkout
         shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          if [ -f pom.xml ]; then
-            echo 'directory=.' >> "$GITHUB_OUTPUT"
-            echo 'bootstrap=false' >> "$GITHUB_OUTPUT"
-          else
-            # Historico do arquivo cobre merges normais, squash e cherry-pick.
-            if [ -n "$(git log -1 --format=%H --diff-filter=A HEAD -- pom.xml)" ]; then
-              echo '::error::O backend ja foi integrado e pom.xml foi removido. Bootstrap proibido.'
-              exit 1
-            fi
-            if ! git merge-base --is-ancestor ba275cd3b08b4e56c5b59628935b74378de8985d HEAD; then
-              echo '::error::Base inesperada; revisar antes de executar o bootstrap.'
-              exit 1
-            fi
-            echo 'Bootstrap explicito: esta branch de configuracao ainda nao contem o backend.'
-            echo 'Validando o commit fixo 04b136c da Etapa 1, sem merge ou copia para a branch.'
-            echo 'directory=_ci/etapa-1' >> "$GITHUB_OUTPUT"
-            echo 'bootstrap=true' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout isolado da Etapa 1 durante bootstrap
-        if: steps.source.outputs.bootstrap == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: nilton-sacramento/kitchen-and-table
-          ref: 04b136c604a9f7a5ce9fb6fb9973aaea910ade99
-          path: _ci/etapa-1
-          persist-credentials: false
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          test -f pom.xml
+          test -f src/main/resources/static/assets/app.js
+          echo "Commit a validar: ${actual_sha}"
 
       - name: Java 17
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -65,7 +45,7 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-          cache-dependency-path: ${{ steps.source.outputs.directory }}/pom.xml
+          cache-dependency-path: pom.xml
 
       - name: Node para verificar JavaScript
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -73,24 +53,24 @@ jobs:
           node-version: '24'
 
       - name: Sintaxe JavaScript
-        working-directory: ${{ steps.source.outputs.directory }}
         run: node --check src/main/resources/static/assets/app.js
 
       - name: Compilacao, testes e empacotamento
-        working-directory: ${{ steps.source.outputs.directory }}
         run: mvn --batch-mode --no-transfer-progress -Ddebug=false -Dlogging.level.org.springframework=INFO verify
 
-      - name: Registrar escopo validado
+      - name: Registrar commit efetivamente validado
         if: success()
         shell: bash
         env:
-          SOURCE_DIRECTORY: ${{ steps.source.outputs.directory }}
-          BOOTSTRAP: ${{ steps.source.outputs.bootstrap }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$EXPECTED_SHA"
           {
             echo '## CI: Java 17 e JavaScript'
-            echo "Bootstrap: ${BOOTSTRAP}"
-            echo "Diretorio validado: ${SOURCE_DIRECTORY}"
-            echo 'JavaScript verificado; Maven verify executado sem desativar testes.'
-            echo 'Sem banco externo: os testes usam mocks; Tomcat temporario apenas em loopback.'
+            echo 'Bootstrap: false; sem dependencia de commit fixo da aplicacao.'
+            echo "Commit solicitado: ${EXPECTED_SHA}"
+            echo "Commit validado: ${actual_sha}"
+            echo 'JavaScript e Maven verify aprovados, sem desativar testes ou acessar banco externo.'
           } >> "$GITHUB_STEP_SUMMARY"

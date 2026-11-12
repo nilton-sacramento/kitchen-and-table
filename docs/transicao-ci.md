@@ -1,6 +1,6 @@
 # Transição do CI e ordem dos PRs — revisão adicional
 
-Nenhum merge foi autorizado nesta revisão. Os comandos deste guia são um procedimento futuro, não comandos já executados.
+Atualização após autorização: o PR #2 foi integrado em develop (30f788a), seu CI passou, develop foi incorporada na feature e o workflow definitivo foi ativado no PR #1. O PR #1 permanece Draft e não foi integrado. O procedimento abaixo registra a sequência planejada; não repetir etapas concluídas. Novas integrações continuam exigindo autorização.
 
 ## Diagnóstico e correções
 
