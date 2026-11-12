@@ -53,10 +53,16 @@ jobs:
           node-version: '24'
 
       - name: Sintaxe JavaScript
-        run: node --check src/main/resources/static/assets/app.js
+        run: |
+          node --check src/main/resources/static/assets/app.js
+          node --check src/main/resources/static/assets/funcionarios.js
+          node --check scripts/smoke-funcionarios.mjs
 
       - name: Compilacao, testes e empacotamento
         run: mvn --batch-mode --no-transfer-progress -Ddebug=false -Dlogging.level.org.springframework=INFO verify
+
+      - name: Smoke da interface em Chrome isolado
+        run: node scripts/smoke-funcionarios.mjs
 
       - name: Registrar commit efetivamente validado
         if: success()
