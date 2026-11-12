@@ -1,5 +1,7 @@
 # Preparação profissional do GitHub
 
+> Atualização: PR #2 integrado por autorização em develop no commit 30f788a; CI aprovado. Feature atualizada com develop e workflow sem bootstrap ativado no PR #1, que continua Draft e sem merge. Os registros abaixo preservam o histórico da preparação anterior; comportamento atual em docs/ci.md.
+
 ## Publicação da Etapa 1
 
 develop e feature/etapa-1-autenticacao foram publicadas sem force push. PR Draft #1: https://github.com/nilton-sacramento/kitchen-and-table/pull/1, origem feature/etapa-1-autenticacao, destino develop. Nenhum merge realizado.

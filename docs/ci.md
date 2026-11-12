@@ -1,31 +1,38 @@
-# Integração contínua
+# Integração contínua — workflow definitivo
 
-Workflow: .github/workflows/ci.yml. Check estável observado: Java 17 e JavaScript (job build, workflow CI). Esse nome foi confirmado em execuções reais bem-sucedidas do GitHub Actions e aplicado como obrigatório; veja docs/github-preparacao.md.
+Workflow ativo: .github/workflows/ci.yml. Check obrigatório: Java 17 e JavaScript, associado ao app oficial GitHub Actions. Nome preservado para compatibilidade com as proteções existentes.
 
-## Execução
+## Código efetivamente validado
 
-Dispara em PRs para develop/main e pushes para develop, feature/**, fix/** e chore/**. Existe também workflow_dispatch, que só aparece na interface quando o workflow está disponível na branch padrão conforme as regras do GitHub.
+Em pull_request o checkout usa github.event.pull_request.head.sha; em push ou execução manual usa github.sha. Antes de testar, compara esse valor com git rev-parse HEAD e exige pom.xml e o arquivo JavaScript no próprio checkout. O resumo repete o commit validado. Não há checkout secundário nem fallback para SHA fixo da aplicação.
 
-Runner ubuntu-latest, Temurin Java 17, Maven e Node 24. Actions fixadas por SHA completo; Dependabot preparado para propor atualizações. O job executa node --check e mvn verify, incluindo compilação, os 18 testes e empacotamento. Não há skip de testes.
+A proteção strict de develop exige a feature atualizada com a base; alterações posteriores da base exigem nova atualização e checks atuais. Depois de uma integração autorizada, o push em develop valida seu próprio commit de merge. Não reutilizar um verde de outro commit ou do antigo bootstrap.
 
-Permissão do token: contents: read. Checkout sem persistir credenciais. Não há pull_request_target, segredos de repositório, publish, deployment, merge, tags ou acesso ao PostgreSQL externo. O teste de sessão usa apenas Tomcat temporário em loopback; dados/autenticação são simulados. Nenhum serviço PostgreSQL é necessário. Logs de Spring em nível INFO para reduzir saída de detalhes de teste. Relatórios XML com propriedades do ambiente não são publicados como artefatos.
+Dispara em PRs para develop/main e em pushes para main, develop, feature/**, fix/** e chore/**. workflow_dispatch fica disponível conforme as regras do GitHub para a branch padrão. Não faz deploy, merge, tags ou publicação de artefatos.
 
-## Bootstrap explícito antes da integração da Etapa 1
+## Execução e segurança
 
-A branch de configuração parte de develop, que ainda não contém pom.xml. Por isso, somente enquanto não há backend integrado, o workflow faz um segundo checkout isolado do commit completo da feature correspondente a 04b136c em _ci/etapa-1 e o testa. Isso não copia o código para a branch nem executa merge. O resumo da execução registra bootstrap e diretório validado.
+Runner ubuntu-latest, Temurin Java 17, Node 24 e Maven verify: sintaxe JavaScript, compilação, testes e empacotamento. Actions fixadas por SHA completo para segurança da cadeia de dependências; esses SHAs não são commits fixos do produto. Dependabot está preparado para propor atualizações dessas Actions.
 
-Quando pom.xml existir, o checkout do evento/PR é testado diretamente. Se o histórico de adição de pom.xml indicar que o backend já foi integrado (inclusive por squash/cherry-pick) e o arquivo desaparecer, o job falha; não pode ocultar uma remoção de backend usando bootstrap. Depois da integração autorizada do PR #2, atualizar a feature e substituir o workflow pelo template definitivo no próprio PR #1, antes de aprovar sua integração. O procedimento está em docs/transicao-ci.md; não deixar a remoção do fallback indefinidamente para depois.
+Token contents: read; checkout sem persistir credenciais; sem secrets, pull_request_target ou acesso ao banco local/produção. Não imprime ambiente nem publica os relatórios XML de testes. Logs Spring em INFO. Testes usam mocks e Tomcat temporário somente em loopback, sem serviço PostgreSQL externo. A suíte existente tem 18 testes, incluindo expiração real de sessão com timeout reduzido apenas no contexto de teste.
 
-Um CI verde de bootstrap prova aquele commit fixo da Etapa 1, não um módulo futuro nem todas as alterações de configuração. actionlint foi utilizado localmente para validar a estrutura do workflow. É necessário conferir o escopo real de cada execução antes do merge.
+## Histórico da transição
 
-## Dependabot e segurança
+O PR #2 foi integrado em develop por autorização, no merge commit 30f788a661e3c72017b1099b62d23cf04c2e95ea. Seu CI passou ainda com o bootstrap, necessário porque aquela branch não tinha backend. Depois, develop foi incorporada na feature com merge commit e o template definitivo foi ativado no próprio PR #1. O PR #1 continua Draft e seu merge não foi autorizado.
 
-.github/dependabot.yml prepara atualizações semanais Maven e GitHub Actions, destinadas a develop e limitadas a cinco PRs por ecossistema. A configuração só passa a ser descoberta pelo Dependabot quando o arquivo estiver na branch padrão (main); nenhum merge em main foi autorizado. Arquivo preparado não significa serviço já ativo ou vulnerabilidades ausentes.
+O arquivo .github/ci-templates/ci-sem-bootstrap.yml permanece como referência da transição, fora dos workflows ativos. O workflow atual já é a versão sem bootstrap. Os registros anteriores de execuções em bootstrap são evidências históricas, não o comportamento atual desta branch.
 
-Secret scanning, push protection, dependency graph e alertas são recursos/configurações do GitHub, separados do YAML. Conferir estado real na API/interface; não inferir ativação apenas por ser repositório público. Consulte docs/protecoes-github.md.
+## Dependabot e limites
 
-## Verificações locais
+.github/dependabot.yml prepara atualizações semanais Maven/Actions para develop. A descoberta da configuração de versões depende da integração aprovada do arquivo na branch padrão main; não está sendo declarada ativa antes disso. Alertas e atualizações automáticas de segurança do Dependabot foram habilitados separadamente no repositório, assim como secret scanning e push protection.
 
-No checkout com backend: mvn --batch-mode --no-transfer-progress verify e node --check src/main/resources/static/assets/app.js. Na branch de configuração sem backend, usar checkout isolado do commit fixo para reproduzir o bootstrap, sem alterar a pasta original nem o banco.
+CI verde não equivale a auditoria completa de vulnerabilidades ou validação de produção. Ver docs/transicao-ci.md, docs/protecoes-github.md e SECURITY.md.
 
-Uma execução local não é resultado remoto do Actions. Consulte docs/github-preparacao.md para o estado efetivo desta preparação.
+## Reproduzir localmente
+
+```powershell
+node --check src/main/resources/static/assets/app.js
+mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.springframework=INFO' verify
+```
+
+Testes não exigem DB_PASSWORD ou banco operacional. Para executar a aplicação com dados existentes, configurar DB_PASSWORD e manter o contêiner original conforme README; não repetir setup nem recriar volumes.
