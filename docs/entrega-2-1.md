@@ -24,7 +24,7 @@ O módulo não administra o acesso do proprietário nem cria outro proprietário
 
 As flags de capacidade orientam a tela; não substituem autorização. Campos extras no JSON não são aplicados como permissões, função ou identidade: cada alteração tem DTO e endpoint próprios. Desativar vínculo não desativa a identidade global nem outras unidades. O nome editado é local; não altera o nome global ou dados de outras unidades.
 
-As operações administrativas usam lock por estabelecimento dentro da transação e versão do vínculo. Locks entre duas unidades têm ordem estável. Essa abordagem é conservadora para este módulo e pode ser otimizada futuramente com medição, sem relaxar a revogação/autorização.
+As mutações administrativas usam lock exclusivo por estabelecimento dentro da transação e versão do vínculo. Locks entre duas unidades têm ordem estável. Consultas de capacidades, equipe, detalhe, delegações e associações usam transações somente de leitura com REPEATABLE_READ, sem SELECT FOR UPDATE. A unidade ativa, o usuário, o vínculo e a autorização são revalidados em cada chamada e pertencem ao mesmo snapshot que os dados consultados. Uma leitura iniciada antes do commit de revogação pode terminar com o estado anterior; novas leituras após esse commit já recusam o acesso. Isso não autoriza escritas: mutações revalidam sob lock e usam READ_COMMITTED. Locks de esquema normais do PostgreSQL não são removidos.
 
 ## Associação sem códigos autenticadores expostos
 
@@ -73,7 +73,7 @@ node --check src/main/resources/static/assets/funcionarios.js
 node scripts/smoke-funcionarios.mjs
 ```
 
-Os 18 testes da Etapa 1 são mantidos sem alterações. FuncionariosPostgresTest acrescenta 30 testes: atualização V1→V4 com conta antiga preservada, login real, identidades sem credenciais administrativas, hierarquia, isolamento, revogação em sessão existente, concorrência, auditoria com rollback real e associação com validade/consumo/revogação.
+Os 18 testes da Etapa 1 são mantidos sem alterações. FuncionariosPostgresTest contém 40 testes (30 originais e 10 da revisão independente): atualização V1→V4 com conta antiga preservada, login real, identidades sem credenciais administrativas, hierarquia, isolamento, revogação em sessão existente, concorrência, auditoria com rollback real e associação com validade/consumo/revogação.
 
 O smoke usa Chrome instalado (ou KT_CHROME_EXECUTABLE), um perfil próprio e uma fixture Java de teste que cria outro PostgreSQL descartável. Credenciais são aleatórias, trocadas somente em memória pelo controlador, sem impressão. O banco/test server são fechados ao encerrar. Não usa perfil pessoal, porta 8080 ou banco existente. Capturas ficam em .tools/browser-artifacts, fora do Git. No runner efêmero de CI, Chrome headless usa --no-sandbox; não há segredos ou dados operacionais nesse ambiente.
 
@@ -93,10 +93,22 @@ Rollback de código não deve apagar funcionários, auditoria ou novas tabelas. 
 
 Novos funcionários, inclusive novos gerentes sem credenciais administrativas, ainda não recebem login operacional. PIN é Entrega 2.3. Contas administrativas existentes continuam autenticando normalmente. Funções adicionais, matriz completa, autorizações críticas avançadas e temporários permanecem nas próximas entregas. Sessões em memória, infraestrutura/HTTPS e revisão de dependências continuam pendências de produção.
 
-## Evidencias locais desta entrega
+## Evidências locais da versão inicial (antes da revisão independente)
 
 Maven verify: 48 testes aprovados, zero falhas, erros ou ignorados; JAR empacotado. Os arquivos dos 18 testes anteriores e a migracao V1 permanecem sem alteracoes. Actionlint e sintaxe JavaScript aprovados.
 
 Smoke Chrome com banco descartavel: login, cadastro sem credenciais administrativas, nome renderizado como texto (incluindo tentativa de markup), edicao, ativacao/desativacao, funcao, delegacao, associacao entre unidades com identidade preservada e funcoes independentes, F5, logout, senha incorreta e layouts 1366x900, 768x1024 e 360x800 aprovados. Confirmacao nativa de situacao e automatizada no smoke; revisao humana de usabilidade continua recomendada.
 
 As primeiras rodadas detectaram falhas de integracao JDBC/DOM e de sincronizacao do smoke; foram corrigidas e os testes repetidos. Nenhum teste foi removido ou marcado como ignorado. Resultados remotos devem ser consultados no PR; nao sao presumidos a partir dos testes locais.
+
+## Ajustes da revisão independente do PR #3
+
+Consultas foram separadas das mutações sem novas migrações. Os 10 testes adicionais verificam leitura durante escrita ainda não confirmada, revalidação de unidade/vínculo, revogação no destino com sessão existente, isolamento de solicitações, expiração sem consumo/auditoria, replay após revogação e quatro cenários ordenados de aceite versus revogação. Os testes de disputa mantêm aberta a primeira transação e verificam pg_blocking_pids para confirmar que a segunda aguarda um lock real, antes de liberar o commit. São testadas as duas ordens de execução tanto na origem quanto no destino.
+
+As regras de associação não foram alteradas: revogação confirmada antes do aceite impede a operação; aceite confirmado antes da revogação mantém o vínculo já criado no destino. Revogar poderes administrativos não apaga retroativamente vínculos independentes. A revalidação existente após o lock passou pelos testes adicionais.
+
+Em 360px, a tabela usa cartões com função, contato, situação e botões visíveis sem rolagem horizontal. Desktop e tablet mantêm tabela. UUIDs completos ficam em detalhes recolhíveis, acessíveis por teclado. O cabeçalho permite quebra do nome do usuário; ações têm área mínima de 44px no mobile, nomes acessíveis contextualizados e foco visível. Abrir editor foca o primeiro campo; Cancelar/Escape retorna ao acionador; salvar mantém referência de foco após atualização. Mensagens de erro usam role alert. Escape no editor não propaga ao atalho global; o atalho do menu só atua quando ele está aberto, evitando roubo de foco.
+
+O smoke foi ampliado para verificar cartões em 360px, tabela em desktop/tablet, tamanho e posição horizontal das ações, identificadores via Enter, ordem de Tab, Escape e retorno de foco após salvar. Capturas locais agora incluem a página inteira para mostrar as ações no mobile. Isso não substitui auditoria completa de acessibilidade, testes com leitor de tela ou dispositivos físicos.
+
+Validação local da revisão: Maven verify com 58 testes aprovados (18 da Etapa 1 e 40 de funcionários), zero falhas, erros ou ignorados. O smoke completo com PostgreSQL descartável e Chrome também passou, incluindo os novos controles de mobile/teclado. Resultados remotos serão registrados no PR com o SHA efetivamente validado. Mantêm-se os riscos de produção e migração descritos acima; nenhuma migração operacional foi executada. O ZIP anterior é uma fotografia de f849f82 e não representa estes ajustes.
