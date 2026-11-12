@@ -40,3 +40,7 @@ backups/
 *.gz
 *.tmp
 *.swp
+# Validacao e ferramentas de CI locais
+.ci-validation/
+.tools/
+_ci/
