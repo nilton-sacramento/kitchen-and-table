@@ -207,3 +207,24 @@ dl{grid-template-columns:1fr;gap:20px}
 @media(prefers-reduced-motion:no-preference){button,a{transition:background .15s,border-color .15s}
 html{scroll-behavior:smooth}
 }
+
+.employee-actions{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.employee-actions button{font-size:11px;padding:9px 12px;min-height:38px}
+.employee-table-wrap{overflow-x:auto;max-width:100%;margin:20px 0;overscroll-behavior-x:contain}
+.employee-table{width:100%;border-collapse:collapse;background:white;font-size:12px;min-width:640px}
+.employee-table th,.employee-table td{padding:16px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.employee-table th{font-size:10px;letter-spacing:.5px;color:var(--muted)}
+.employee-table td:first-child{min-width:180px;max-width:280px;overflow-wrap:anywhere}
+.employee-table td:last-child{min-width:200px}
+.employee-identity{display:block;font-size:9px;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}
+.employee-editor{background:#fff;border:1px solid var(--line);border-radius:8px;padding:24px;margin:20px 0}
+.employee-form{display:grid;gap:18px;max-width:580px}
+.employee-form h3{margin:0}.employee-form p{margin:0}
+.employee-check{display:flex;align-items:center;gap:10px;margin:0;font-weight:400}
+.employee-check input{width:18px;min-height:18px;margin:0}
+.employee-feedback{background:#e9efdd;border:1px solid #c9d8b8;padding:14px;border-radius:6px;font-size:13px}
+.employee-request{padding:20px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.employee-request select{max-width:300px;margin-bottom:12px}
+#employee-view h3{font-size:18px;font-weight:500}
+#employee-view>.section-heading{align-items:flex-start}
+@media(max-width:760px){#employee-view>.section-heading{align-items:start}.employee-editor{padding:18px}}

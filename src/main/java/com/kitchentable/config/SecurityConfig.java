@@ -26,7 +26,7 @@ public class SecurityConfig {
     UserDetailsService userDetailsService(JdbcTemplate jdbc) {
         return email -> {
             var users = jdbc.query(
-                "SELECT email, senha_hash, ativo FROM usuarios WHERE lower(email)=lower(?)",
+                "SELECT email, senha_hash, ativo FROM usuarios WHERE lower(email)=lower(?) AND senha_hash IS NOT NULL",
                 (rs, row) -> User
                     .withUsername(rs.getString("email"))
                     .password(rs.getString("senha_hash"))
@@ -71,7 +71,7 @@ public class SecurityConfig {
                 .deleteCookies("JSESSIONID")
                 .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/app.css", "/assets/app.js").permitAll()
+                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/app.css", "/assets/app.js", "/assets/funcionarios.js").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/setup/proprietario").permitAll()

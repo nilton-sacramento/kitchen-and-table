@@ -1,6 +1,7 @@
+import { createEmployeeScreen } from './funcionarios.js';
 const $ = (id) => document.getElementById(id);
 const modules = [
-  ['funcionarios', 'Funcionários', '♙', 'Equipe, vínculos e permissões de acesso.'],
+  ['funcionarios', 'Funcionários', '♙', 'Cadastro e vínculos por estabelecimento.'],
   ['produtos', 'Produtos', '◇', 'Produtos, cardápio e combos do estabelecimento.'],
   ['mesas', 'Mesas', '▦', 'Organização e acompanhamento do atendimento em mesas.'],
   ['comandas', 'Comandas', '▤', 'Consumo e acompanhamento de cada atendimento.'],
@@ -16,9 +17,10 @@ let authenticated = false;
 let establishments = [];
 let generation = 0;
 let loadingEstablishments = false;
+const employeeScreen = createEmployeeScreen({ root: $('employee-view'), api: getApi, getEstablishments: () => establishments, onExpired: () => logout('Sua sessão expirou. Entre novamente.') });
 
 class ApiError extends Error {
-  constructor(status) { super('Falha na requisição'); this.status = status; }
+  constructor(status, detail) { super('Falha na requisição'); this.status = status; this.detail = detail; }
 }
 
 async function getApi(path, options = {}) {
@@ -30,7 +32,11 @@ async function getApi(path, options = {}) {
       headers: { Accept: 'application/json', ...options.headers },
       credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: controller.signal,
     });
-    if (!response.ok) throw new ApiError(response.status);
+    if (!response.ok) {
+      let detail;
+      try { const problem = await response.json(); if (typeof problem.detail === 'string') detail = problem.detail; } catch { /* Resposta sem JSON. */ }
+      throw new ApiError(response.status, detail);
+    }
     return response.status === 204 ? null : await response.json();
   } finally { clearTimeout(timeout); }
 }
@@ -58,6 +64,7 @@ function showLoginError(message) {
 }
 
 function logout(message = '') {
+  employeeScreen.reset();
   generation++;
   authenticated = false;
   establishments = [];
@@ -85,11 +92,16 @@ function closeMenu() {
 function showPage(id, focus = true) {
   const module = modules.find((item) => item[0] === id);
   const dashboard = !module;
+  const employees = id === 'funcionarios';
+  $('employee-view').hidden = !employees;
+  if (employees) employeeScreen.activate($('establishment-select').value);
+  else employeeScreen.reset();
   $('dashboard').hidden = !dashboard;
-  $('module-view').hidden = dashboard;
+  $('module-view').hidden = dashboard || employees;
   $('page-title').textContent = dashboard ? 'Visão geral' : module[1];
   $('breadcrumb').textContent = dashboard ? 'VISÃO GERAL' : module[1].toLocaleUpperCase('pt-BR');
-  $('page-description').textContent = dashboard ? 'Seu estabelecimento, no centro da gestão.' : 'Um próximo passo na evolução da sua gestão.';
+  $('page-description').textContent = dashboard ? 'Seu estabelecimento, no centro da gestão.' : employees ? 'Cadastros e vínculos independentes por unidade.' : 'Um próximo passo na evolução da sua gestão.';
+  $('page-phase').textContent = employees ? 'ENTREGA 2.1' : 'ACESSO INICIAL';
   if (module) {
     $('module-title').textContent = module[1];
     $('module-description').textContent = module[3];
@@ -128,6 +140,7 @@ function selectEstablishment() {
   const role = selected ? (roles[selected.funcao] || selected.funcao) : '—';
   $('establishment-role').textContent = selected ? `Sua função: ${role}` : 'Consulte o responsável pelo seu acesso.';
   $('user-role').textContent = role;
+  if (!$('employee-view').hidden) employeeScreen.activate(selected?.id);
 }
 
 async function loadEstablishments() {
@@ -220,7 +233,7 @@ for (const [id, title, icon, description] of [['dashboard', 'Visão geral', '⊞
   if (id !== 'dashboard') {
     const badge = document.createElement('span');
     badge.className = 'coming';
-    badge.textContent = 'Em breve';
+    badge.textContent = id === 'funcionarios' ? 'Equipe' : 'Em breve';
     button.append(badge);
     const card = document.createElement('button');
     card.type = 'button';
@@ -229,7 +242,7 @@ for (const [id, title, icon, description] of [['dashboard', 'Visão geral', '⊞
     top.className = 'card-top';
     const status = document.createElement('span');
     status.className = 'phase-badge';
-    status.textContent = 'EM DESENVOLVIMENTO';
+    status.textContent = id === 'funcionarios' ? 'GESTÃO DA EQUIPE' : 'EM DESENVOLVIMENTO';
     top.append(symbol.cloneNode(true), status);
     const name = document.createElement('strong');
     name.textContent = title;
