@@ -1,6 +1,6 @@
 # Integração contínua
 
-Workflow: .github/workflows/ci.yml. Check estável planejado: Java 17 e JavaScript (job build, workflow CI). Só torná-lo obrigatório depois de confirmar esse nome em uma execução real do GitHub Actions.
+Workflow: .github/workflows/ci.yml. Check estável observado: Java 17 e JavaScript (job build, workflow CI). Esse nome foi confirmado em execuções reais bem-sucedidas do GitHub Actions e aplicado como obrigatório; veja docs/github-preparacao.md.
 
 ## Execução
 

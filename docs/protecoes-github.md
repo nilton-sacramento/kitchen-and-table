@@ -1,4 +1,4 @@
-# Proteções do GitHub — plano e limites
+# Proteções do GitHub — regras e limites
 
 main e develop devem integrar alterações por PR, bloquear force push/exclusão e manter resolução de conversas. Para trabalho individual, não exigir aprovação de outra pessoa: required_approving_review_count = 0, mantendo a revisão pelo proprietário e o checklist. Não ativar exigência de CODEOWNERS ou aprovação do último push sem combinar colaboradores.
 
@@ -21,3 +21,5 @@ A documentação oficial informa disponibilidade de proteção de branches em re
 Referências: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches e https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-security-and-analysis-settings-for-your-repository
 
 Consulte docs/github-preparacao.md para o que foi efetivamente aplicado, preparado ou bloqueado nesta sessão.
+
+Estado aplicado: as regras de main/develop descritas acima foram configuradas e verificadas pela API com check real aprovado. Consulte docs/github-preparacao.md para evidencias e limites. A ordem recomendada de revisao e integracao futura e PR #2 (infraestrutura), depois CI no PR #1 (implementacao). Nenhum desses merges foi executado.
