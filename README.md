@@ -2,7 +2,9 @@
 
 SaaS de gestão para restaurantes, bares e lanchonetes, em desenvolvimento por etapas.
 
-A Etapa 1 implementa a interface inicial e a autenticação por sessão. Os módulos operacionais ainda não estão implementados. Não é uma versão pronta para produção.
+A Etapa 1 implementa a interface inicial e a autenticação por sessão. Esta feature acrescenta a Entrega 2.1: gestão administrativa de funcionários e vínculos, em revisão. Não é uma versão pronta para produção.
+
+**Antes de executar esta feature com dados existentes, leia [o plano de migrações e testes](docs/entrega-2-1.md). Não iniciar contra o PostgreSQL operacional sem aprovação específica de backup/migração.**
 
 ## Arquitetura implementada
 
@@ -23,7 +25,7 @@ Angular, JWT, JPA, WebSockets e operação offline não fazem parte desta implem
 - Cookie HttpOnly/SameSite=Lax, CSRF no login/logout e HTTP Basic desabilitado.
 - Navegação para módulos futuros, sinalizados como em desenvolvimento.
 
-Permissões granulares, funcionários, produtos, mesas, comandas, pedidos, cozinha, bar, estoque, caixa e relatórios continuam pendentes. A função exibida no painel não equivale a autorização granular implementada.
+Cadastro/gestão de funcionários, vínculos, delegações administrativas mínimas e associação controlada estão implementados nesta feature. PIN, permissões granulares completas, funções adicionais, temporários, produtos, mesas, comandas, pedidos, cozinha, bar, estoque, caixa e relatórios continuam pendentes. A função exibida no painel não equivale a autorização granular implementada.
 
 ## Executar localmente no Windows
 
@@ -49,7 +51,7 @@ Não há senha padrão do banco no código. Um arquivo .env do Compose não é c
 mvn test
 ```
 
-Os testes não conectam ao PostgreSQL. A expiração usa Tomcat real em porta aleatória de loopback e timeout de dois segundos somente no contexto de teste; o prazo normal permanece 30 minutos.
+Os testes conectam somente a PostgreSQL 16 descartável para a Entrega 2.1; os testes anteriores usam mocks/Tomcat isolado. Docker é necessário, sem acesso ao banco operacional. A expiração usa Tomcat real em porta aleatória de loopback e timeout de dois segundos somente no contexto de teste; o prazo normal permanece 30 minutos.
 
 Para executar somente a expiração:
 
@@ -67,6 +69,7 @@ Senhas nos testes são fictícias e usadas exclusivamente com dependências simu
 
 ## Documentação e versionamento
 
+- [Entrega 2.1: funcionalidades, segurança e migrações](docs/entrega-2-1.md)
 - [Autenticação por sessão](docs/autenticacao-sessao.md)
 - [Situação da Etapa 1 e evidências](docs/etapa-1.md)
 - [Fluxo de branches e propostas de PR](docs/fluxo-publicacao.md)

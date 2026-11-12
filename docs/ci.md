@@ -14,7 +14,7 @@ Dispara em PRs para develop/main e em pushes para main, develop, feature/**, fix
 
 Runner ubuntu-latest, Temurin Java 17, Node 24 e Maven verify: sintaxe JavaScript, compilação, testes e empacotamento. Actions fixadas por SHA completo para segurança da cadeia de dependências; esses SHAs não são commits fixos do produto. Dependabot está preparado para propor atualizações dessas Actions.
 
-Token contents: read; checkout sem persistir credenciais; sem secrets, pull_request_target ou acesso ao banco local/produção. Não imprime ambiente nem publica os relatórios XML de testes. Logs Spring em INFO. Testes usam mocks e Tomcat temporário somente em loopback, sem serviço PostgreSQL externo. A suíte existente tem 18 testes, incluindo expiração real de sessão com timeout reduzido apenas no contexto de teste.
+Token contents: read; checkout sem persistir credenciais; sem secrets, pull_request_target ou acesso ao banco local/produção. Não imprime ambiente nem publica os relatórios XML de testes. Logs Spring em INFO. Os 18 testes anteriores usam mocks/Tomcat em loopback; os 30 novos testes da Entrega 2.1 usam PostgreSQL 16 descartável via Testcontainers. Não há banco externo ou dado operacional. O smoke obrigatório usa outro banco descartável e Chrome isolado para validar frontend real; veja docs/entrega-2-1.md.
 
 ## Histórico da transição
 
