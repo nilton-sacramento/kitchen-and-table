@@ -1,16 +1,42 @@
-# Node & Angular
+# IDEs e sistema operacional
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Java, Maven e ferramentas de build
+**/target/
+*.class
+*.log
+**/.gradle/
+**/build/
 **/node_modules/
 **/dist/
 **/.angular/
 
-# Java & Spring Boot
-**/target/
-**/.gradle/
-**/build/
-**/.idea/
-*.iml
-.vscode/
+# Segredos e ambiente local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+.aws/
+.codex/
 
-# Logs e arquivos de sistema
-*.log
-.DS_Store
+# Backups, dumps, recuperacao e arquivos temporarios
+recovery/
+backups/
+*.bak
+*.dump
+*.backup
+*.zip
+*.7z
+*.tar
+*.gz
+*.tmp
+*.swp
