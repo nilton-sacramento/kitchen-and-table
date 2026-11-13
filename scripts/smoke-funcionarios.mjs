@@ -56,10 +56,22 @@ try {
   const executable = process.env.KT_CHROME_EXECUTABLE || (process.platform === 'win32' ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : 'google-chrome');
   await fs.mkdir(profile, { recursive: true });
   chrome = spawn(executable, ['--headless=new', ...(process.env.CI ? ['--no-sandbox'] : []), '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-sync', '--disable-extensions', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
-  chrome.stderr.on('data', () => {});
+  let launchError = null, launchStderr = '';
+  chrome.on('error', (error) => { launchError = error.code || 'START_ERROR'; });
+  chrome.stderr.on('data', (chunk) => { if (launchStderr.length < 4096) launchStderr += chunk.toString(); });
   let port;
-  for (let i = 0; i < 100; i++) { try { port = Number((await fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]); if (port) break; } catch {} await pause(100); }
-  if (!port) throw new Error('Chrome de teste não iniciou.');
+  for (let i = 0; i < 300; i++) {
+    try { port = Number((await fs.readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]); if (port) break; } catch {}
+    if (launchError || chrome.exitCode !== null) break;
+    await pause(100);
+  }
+  if (!port) {
+    // Apenas inicializacao em about:blank, antes do login; nunca logs de sessao.
+    const diagnostic = launchStderr.replaceAll(profile, '[perfil descartavel]').replace(/(?:wss?|https?):\/\/\S+/gu, '[URL omitida]').slice(-2500);
+    console.log('CHROME_START_DIAGNOSTIC:', JSON.stringify({ exitCode: chrome.exitCode, launchError, stderr: diagnostic }));
+    throw new Error('Chrome de teste não iniciou.');
+  }
+  launchStderr = '';
   const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
   socket = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = () => reject(new Error('Falha na conexão com Chrome.')); });
