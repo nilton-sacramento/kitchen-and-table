@@ -41,7 +41,7 @@ class FuncionariosPostgresTest {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry props) {
         PG.start();
-        // Migrar primeiro somente V1, inserir estado legado e deixar Spring aplicar V2-V4.
+        // Migrar primeiro somente V1, inserir estado legado e deixar Spring aplicar V2-V7.
         Flyway.configure().dataSource(PG.getJdbcUrl(),PG.getUsername(),PG.getPassword()).target("1").load().migrate();
         var jdbc=new JdbcTemplate(new DriverManagerDataSource(PG.getJdbcUrl(),PG.getUsername(),PG.getPassword()));
         jdbc.update("INSERT INTO usuarios(id,nome,email,senha_hash) VALUES(?,'Legado de teste',?,?)",LEGACY_USER,LEGACY_EMAIL,LEGACY_HASH);
@@ -55,6 +55,7 @@ class FuncionariosPostgresTest {
     @Autowired ObjectMapper json;
     @Autowired FuncionarioService service;
     @Autowired AssociacaoFuncionarioService associacoes;
+    @Autowired PermissoesService permissoes;
     UUID a,b,c,owner,manager,managerLink;
     String ownerEmail,managerEmail;
     MockHttpSession ownerSession,managerSession;
@@ -97,7 +98,7 @@ class FuncionariosPostgresTest {
         assertEquals(LEGACY_HASH,jdbc.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(LEGACY_EMAIL,jdbc.queryForObject("SELECT email FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(0L,jdbc.queryForObject("SELECT versao FROM usuarios_estabelecimentos WHERE id=?",Long.class,LEGACY_LINK));
-        assertEquals(4,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
+        assertEquals(7,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
         assertTrue(jdbc.queryForObject("SELECT version()",String.class).contains("PostgreSQL 16"));
         mvc.perform(get("/api/v1/auth/me").session(login(LEGACY_EMAIL))).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(LEGACY_USER.toString()));
     }
@@ -383,5 +384,255 @@ class FuncionariosPostgresTest {
         assertEquals(409,statusOf(()->associacoes.aceitar(b,req,ownerEmail,UUID.randomUUID(),new Aceite("ATENDENTE"))));
         assertTrue(associacoes.listar(b,ownerEmail).isEmpty());
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='ASSOCIACAO_ACEITA'",Integer.class,b));
+    }
+    PermissoesDtos.Efetiva efetiva(UUID unit,UUID target,String codigo){
+        return permissoes.painel(unit,target,ownerEmail).permissoes().stream().filter(p->p.permissao().codigo().equals(codigo)).findFirst().orElseThrow();
+    }
+    void estado(UUID unit,UUID target,String codigo,PermissoesDtos.Estado estado){
+        permissoes.excecao(unit,target,codigo,ownerEmail,new PermissoesDtos.Excecao(estado,service.consultar(unit,target,ownerEmail).versao()));
+    }
+    void limitesNovos(List<UUID> targets,boolean adicionais,boolean grant,boolean revoke,String... codes){
+        permissoes.limites(a,managerLink,ownerEmail,new PermissoesDtos.Limites(adicionais,targets,Arrays.stream(codes).map(c->new PermissoesDtos.LimiteCodigo(c,grant,revoke)).toList(),service.consultar(a,managerLink,ownerEmail).versao()));
+    }
+    @Test void adicionaisUnemHerancaSemHabilitarModuloFuturo() throws Exception {
+        var f=create(a,"Multifuncao","ATENDENTE");var p=permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(List.of("COZINHA","BAR"),0L));
+        assertEquals(List.of("BAR","COZINHA"),p.adicionais());
+        assertEquals(Set.of("ATENDENTE","COZINHA","BAR"),new HashSet<>(efetiva(a,id(f),"PRODUTO_CONSULTAR").herdadaDe()));
+        assertTrue(efetiva(a,id(f),"COZINHA_FILA_CONSULTAR").configurada());assertFalse(efetiva(a,id(f),"COZINHA_FILA_CONSULTAR").efetiva());
+    }
+    @Test void negarPrevaleceSobreTodasFuncoesERetornoHerdarRestaura() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),0L));
+        estado(a,id(f),"PRODUTO_CONSULTAR",PermissoesDtos.Estado.NEGAR);assertFalse(efetiva(a,id(f),"PRODUTO_CONSULTAR").configurada());
+        estado(a,id(f),"PRODUTO_CONSULTAR",PermissoesDtos.Estado.HERDAR);assertTrue(efetiva(a,id(f),"PRODUTO_CONSULTAR").configurada());
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM usuarios_permissoes WHERE vinculo_id=?",Integer.class,id(f)));
+    }
+    @Test void concessaoIndividualNaoHerdadaPodeSerRevogada() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");assertFalse(efetiva(a,id(f),"ESTOQUE_AJUSTAR").configurada());
+        estado(a,id(f),"ESTOQUE_AJUSTAR",PermissoesDtos.Estado.PERMITIR);assertTrue(efetiva(a,id(f),"ESTOQUE_AJUSTAR").configurada());
+        estado(a,id(f),"ESTOQUE_AJUSTAR",PermissoesDtos.Estado.NEGAR);assertFalse(efetiva(a,id(f),"ESTOQUE_AJUSTAR").configurada());
+    }
+    @Test void adicionaisAdministrativasPrincipalRepetidaEDuplicadasSaoNegadas() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");
+        for(var roles:List.of(List.of("GERENTE"),List.of("PROPRIETARIO"),List.of("ATENDENTE"),List.of("BAR","BAR")))
+            assertEquals(400,statusOf(()->permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(roles,0L))));
+        assertTrue(permissoes.painel(a,id(f),ownerEmail).adicionais().isEmpty());
+    }
+    @Test void bancoTambemImpedeAdicionalAdministrativa() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->jdbc.update("INSERT INTO vinculos_funcoes_adicionais(vinculo_id,estabelecimento_id,funcao_id) SELECT ?,?,id FROM funcoes WHERE codigo='GERENTE'",id(f),a));
+    }
+    @Test void funcoesOperacionaisNaoConcedemAdministracao() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(List.of("BAR","COZINHA","CAIXA"),0L));
+        estado(a,id(f),"FUNCIONARIO_CADASTRAR",PermissoesDtos.Estado.PERMITIR);
+        assertFalse(efetiva(a,id(f),"FUNCIONARIO_CADASTRAR").efetiva());
+        assertTrue(permissoes.painel(a,id(f),ownerEmail).permissoes().stream().filter(p->p.permissao().categoria().equals("FINANCEIRA")).noneMatch(PermissoesDtos.Efetiva::configurada));
+    }
+    @Test void gerenteSemNovaDelegacaoNaoPodeConsultarOuAlterarExcecoes() throws Exception {
+        grant(true);var f=create(a,"Pessoa","ATENDENTE");
+        assertEquals(403,statusOf(()->permissoes.painel(a,id(f),managerEmail)));
+        assertEquals(403,statusOf(()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,0L))));
+    }
+    @Test void limitesIndividuaisDistinguemConcederRevogarEHerdar() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),false,true,false,"PRODUTO_CONSULTAR");
+        permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L));
+        assertEquals(403,statusOf(()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,1L))));
+        assertEquals(403,statusOf(()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.HERDAR,1L))));
+    }
+    @Test void delegadoRevogadorNaoPodeUsarHerdarParaConceder() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),false,false,true,"PRODUTO_CONSULTAR");
+        permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,0L));
+        assertEquals(403,statusOf(()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.HERDAR,1L))));
+    }
+    @Test void limitesDeAlvoECodigoSaoObrigatorios() throws Exception {
+        grant(true);var f=create(a,"Permitido","COZINHA");var outra=create(a,"Fora","ATENDENTE");limitesNovos(List.of(id(f)),false,true,true,"PRODUTO_CONSULTAR");
+        assertEquals(1,permissoes.alvos(a,managerEmail).size());
+        assertTrue(service.listar(a,managerEmail).stream().noneMatch(row->row.vinculoId().equals(id(f))));
+        assertEquals(403,statusOf(()->permissoes.painel(a,id(outra),managerEmail)));
+        assertEquals(403,statusOf(()->permissoes.excecao(a,id(f),"CAIXA_ABRIR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L))));
+    }
+    @Test void gerenteNaoAlteraPropriosLimitesOuPermissoes() throws Exception {
+        assertEquals(403,statusOf(()->permissoes.limites(a,managerLink,managerEmail,new PermissoesDtos.Limites(true,List.of(),List.of(),0L))));
+        assertEquals(403,statusOf(()->permissoes.excecao(a,managerLink,"FUNCIONARIO_EDITAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L))));
+    }
+    @Test void proprietarioNaoPodeSerAlvoNemReceberExcecao() {
+        UUID target=jdbc.queryForObject("SELECT id FROM usuarios_estabelecimentos WHERE usuario_id=? AND estabelecimento_id=?",UUID.class,owner,a);
+        assertEquals(403,statusOf(()->permissoes.excecao(a,target,"FUNCIONARIO_CONSULTAR",ownerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,0L))));
+        assertEquals(403,statusOf(()->permissoes.adicionais(a,target,ownerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),0L))));
+        assertEquals(403,statusOf(()->permissoes.limites(a,managerLink,ownerEmail,new PermissoesDtos.Limites(false,List.of(target),List.of(),0L))));
+    }
+    @Test void limitesNaoAceitamGerenteOutraUnidadeOuCodigoExclusivo() throws Exception {
+        var outro=create(a,"Gerente","GERENTE");var estrangeiro=create(b,"Pessoa","ATENDENTE");
+        assertEquals(403,statusOf(()->permissoes.limites(a,managerLink,ownerEmail,new PermissoesDtos.Limites(false,List.of(id(outro)),List.of(),0L))));
+        assertEquals(404,statusOf(()->permissoes.limites(a,managerLink,ownerEmail,new PermissoesDtos.Limites(false,List.of(id(estrangeiro)),List.of(),0L))));
+        assertEquals(400,statusOf(()->permissoes.limites(a,managerLink,ownerEmail,new PermissoesDtos.Limites(false,List.of(),List.of(new PermissoesDtos.LimiteCodigo("GERENTE_NOMEAR",true,true)),0L))));
+    }
+    @Test void criticasExigemCodigoExpressoMesmoComOutrasDelegacoes() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),false,true,true,"CAIXA_OPERAR");
+        assertEquals(403,statusOf(()->permissoes.excecao(a,id(f),"CAIXA_FECHAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L))));
+        limitesNovos(List.of(id(f)),false,true,true,"CAIXA_FECHAR");
+        permissoes.excecao(a,id(f),"CAIXA_FECHAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L));
+        var p=efetiva(a,id(f),"CAIXA_FECHAR");assertTrue(p.configurada());assertFalse(p.efetiva());
+    }
+    @Test void limitesAdicionaisSaoExpressosEIndependentes() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),false,true,true,"PRODUTO_CONSULTAR");
+        assertEquals(403,statusOf(()->permissoes.adicionais(a,id(f),managerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),0L))));
+        limitesNovos(List.of(id(f)),true,false,false);
+        permissoes.adicionais(a,id(f),managerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),0L));assertEquals(List.of("BAR"),permissoes.painel(a,id(f),managerEmail).adicionais());
+    }
+    @Test void revogarLimitesAfetaSessaoJaAberta() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),true,true,true,"PRODUTO_CONSULTAR");
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/funcionarios/"+id(f)).session(managerSession)).andExpect(status().isOk());
+        limitesNovos(List.of(),false,false,false);
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/funcionarios/"+id(f)).session(managerSession)).andExpect(status().isForbidden());
+    }
+    @Test void negacaoIndividualRevogaAcaoAntigaSemNovoLogin() throws Exception {
+        grant(true);mvc.perform(get(path(a)).session(managerSession)).andExpect(status().isOk());
+        estado(a,managerLink,"FUNCIONARIO_CONSULTAR",PermissoesDtos.Estado.NEGAR);
+        mvc.perform(get(path(a)).session(managerSession)).andExpect(status().isForbidden());
+        estado(a,managerLink,"FUNCIONARIO_CONSULTAR",PermissoesDtos.Estado.HERDAR);
+        mvc.perform(get(path(a)).session(managerSession)).andExpect(status().isOk());
+    }
+    @Test void permitirNaoContornaAsSeisDelegacoes() {
+        estado(a,managerLink,"FUNCIONARIO_CADASTRAR",PermissoesDtos.Estado.PERMITIR);
+        assertEquals(403,statusOf(()->service.cadastrar(a,managerEmail,UUID.randomUUID(),new Cadastro("Negado","ATENDENTE",null,null))));
+    }
+    @Test void negacaoDeFuncaoPrincipalNaoSeConfundeComEditarContato() throws Exception {
+        grant(true);var f=create(a,"Pessoa","ATENDENTE");estado(a,managerLink,"FUNCIONARIO_FUNCAO_PRINCIPAL_ALTERAR",PermissoesDtos.Estado.NEGAR);
+        assertFalse(permissoes.capacidades(a,managerEmail).alterarPrincipal());
+        service.editar(a,id(f),managerEmail,new Edicao("Local",null,null,0L));
+        assertEquals(403,statusOf(()->service.funcao(a,id(f),managerEmail,new Funcao("ATENDENTE",1L))));
+    }
+    @Test void isolamentoDasExcecoesEntreVinculosEMesmaIdentidade() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");var second=associacoes.aceitar(b,request(a,b,id(f),ownerEmail),ownerEmail,UUID.randomUUID(),new Aceite("BAR"));
+        permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(List.of("COZINHA"),0L));estado(a,id(f),"PRODUTO_CONSULTAR",PermissoesDtos.Estado.NEGAR);
+        assertTrue(permissoes.painel(b,second.vinculoId(),ownerEmail).adicionais().isEmpty());assertEquals(PermissoesDtos.Estado.HERDAR,efetiva(b,second.vinculoId(),"PRODUTO_CONSULTAR").estado());
+        assertEquals(404,statusOf(()->permissoes.painel(a,second.vinculoId(),ownerEmail)));
+    }
+    @Test void negacaoDeUnidadeRemoveSelecaoEImpedeAPIsProtegidas() throws Exception {
+        grant(true);UUID other=link(manager,b,"GERENTE");estado(a,managerLink,"ESTABELECIMENTO_VISUALIZAR",PermissoesDtos.Estado.NEGAR);
+        mvc.perform(get("/api/v1/estabelecimentos").session(managerSession)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].id").value(b.toString()));
+        mvc.perform(get(path(a)).session(managerSession)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/minhas").session(managerSession)).andExpect(status().isForbidden());
+        assertTrue(permissoes.minhas(b,managerEmail).stream().anyMatch(p->p.permissao().codigo().equals("ESTABELECIMENTO_VISUALIZAR")&&p.efetiva()));
+    }
+    @Test void alteracaoConcorrenteDeExcecaoRetornaConflito() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");
+        var results=race(()->statusOf(()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",ownerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L))),()->statusOf(()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",ownerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,0L))));
+        assertEquals(Set.of(200,409),new HashSet<>(results));assertEquals(1L,service.consultar(a,id(f),ownerEmail).versao());
+    }
+    @Test void revogacaoPrimeiroImpedeAlteracaoDePermissaoAposLock() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),false,true,true,"PRODUTO_CONSULTAR");
+        assertEquals(List.of(200,403),serializadas(()->limitesNovos(List.of(),false,false,false),()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L))));
+        assertEquals(PermissoesDtos.Estado.HERDAR,efetiva(a,id(f),"PRODUTO_CONSULTAR").estado());
+    }
+    @Test void alteracaoPrimeiroPreservaAuditoriaAntesDaRevogacao() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),false,true,true,"PRODUTO_CONSULTAR");
+        assertEquals(List.of(200,200),serializadas(()->permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L)),()->limitesNovos(List.of(),false,false,false)));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='PERMISSAO_INDIVIDUAL_ALTERADA'",Integer.class,a));
+    }
+    @Test void trocaPrincipalRemoveRepeticaoERevogaLimitesNovos() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),true,true,true,"PRODUTO_CONSULTAR");
+        permissoes.adicionais(a,managerLink,ownerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),1L));
+        service.funcao(a,managerLink,ownerEmail,new Funcao("BAR",2L));assertTrue(permissoes.painel(a,managerLink,ownerEmail).adicionais().isEmpty());
+        service.funcao(a,managerLink,ownerEmail,new Funcao("GERENTE",3L));assertTrue(permissoes.capacidades(a,managerEmail).alvos().isEmpty());
+        String event=jdbc.queryForObject("SELECT dados_evento::text FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='FUNCAO_PRINCIPAL_ALTERADA' ORDER BY ocorrido_em LIMIT 1",String.class,a);
+        assertTrue(event.contains("adicionais"));assertTrue(event.contains("PRODUTO_CONSULTAR"));
+    }
+    @Test void falhaAuditoriaReverteExcecaoEVersao() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");
+        jdbc.execute("ALTER TABLE auditoria_eventos ADD CONSTRAINT permission_fail_"+a.toString().replace("-","")+" CHECK (estabelecimento_id <> '"+a+"'::uuid OR tipo_evento <> 'PERMISSAO_INDIVIDUAL_ALTERADA') NOT VALID");
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->estado(a,id(f),"PRODUTO_CONSULTAR",PermissoesDtos.Estado.NEGAR));
+        assertEquals(0L,service.consultar(a,id(f),ownerEmail).versao());assertEquals(PermissoesDtos.Estado.HERDAR,efetiva(a,id(f),"PRODUTO_CONSULTAR").estado());
+    }
+    @Test void novosEndpointsExigemAutenticacaoCsrfEValidamEntradas() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");String base="/api/v1/estabelecimentos/"+a+"/permissoes";
+        mvc.perform(get(base+"/catalogo")).andExpect(status().isUnauthorized());
+        mvc.perform(put(base+"/funcionarios/"+id(f)+"/adicionais").session(ownerSession).contentType("application/json").content("{\"funcoes\":[\"BAR\"],\"versao\":0}")).andExpect(status().isForbidden());
+        for(String body:List.of("{}","{\"funcoes\":null,\"versao\":0}","{\"funcoes\":[\"BAR\"],\"versao\":-1}"))
+            mvc.perform(put(base+"/funcionarios/"+id(f)+"/adicionais").session(ownerSession).with(csrf()).contentType("application/json").content(body)).andExpect(status().isBadRequest());
+        mvc.perform(put(base+"/funcionarios/"+id(f)+"/individuais/PRODUTO_CONSULTAR").session(ownerSession).with(csrf()).contentType("application/json").content("{\"estado\":\"INVENTADO\",\"versao\":0}")).andExpect(status().isBadRequest());
+    }
+    @Test void catalogoPreservaLegadosSemAutoridadeAutomatica() {
+        var catalog=permissoes.catalogo(a,ownerEmail);assertEquals(52,catalog.size());
+        for(String c:List.of("FUNCIONARIO_GERENCIAR","PERMISSAO_GERENCIAR"))assertFalse(catalog.stream().filter(p->p.codigo().equals(c)).findFirst().orElseThrow().disponivel());
+        assertTrue(permissoes.minhas(a,managerEmail).stream().filter(p->p.permissao().categoria().equals("ADMINISTRATIVA")&&!p.permissao().codigo().equals("ESTABELECIMENTO_VISUALIZAR")).noneMatch(PermissoesDtos.Efetiva::efetiva));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM funcoes_permissoes fp JOIN permissoes p ON p.id=fp.permissao_id WHERE p.categoria='FINANCEIRA'",Integer.class));
+    }
+    @Test void migracaoV4ParaV7PreservaCredenciaisEDelegacoes() {
+        String name="kt_upgrade_"+UUID.randomUUID().toString().replace("-","");jdbc.execute("CREATE DATABASE "+name);
+        String url=PG.getJdbcUrl().replace("/kt_funcionarios_test","/"+name);var ds=new DriverManagerDataSource(url,PG.getUsername(),PG.getPassword());
+        var flyway=Flyway.configure().dataSource(ds).target("4").load();flyway.migrate();var db=new JdbcTemplate(ds);
+        UUID user=UUID.randomUUID(),unit=UUID.randomUUID(),link=UUID.randomUUID();
+        db.update("INSERT INTO usuarios(id,nome,email,senha_hash) VALUES(?,'Legado',?,?)",user,"upgrade@example.com",LEGACY_HASH);
+        db.update("INSERT INTO estabelecimentos(id,nome) VALUES(?,'Upgrade')",unit);
+        db.update("INSERT INTO usuarios_estabelecimentos(id,usuario_id,estabelecimento_id,funcao_id) SELECT ?,?,?,id FROM funcoes WHERE codigo='GERENTE'",link,user,unit);
+        db.update("INSERT INTO delegacoes_administrativas(vinculo_id,consultar,funcoes) VALUES(?,true,ARRAY['ATENDENTE'])",link);
+        db.update("INSERT INTO funcoes_permissoes(funcao_id,permissao_id) SELECT f.id,p.id FROM funcoes f CROSS JOIN permissoes p WHERE f.codigo='GERENTE' AND p.codigo='ESTABELECIMENTO_VISUALIZAR'");
+        var before=db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
+        Flyway.configure().dataSource(ds).load().migrate();
+        assertEquals(before,db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4') ORDER BY installed_rank"));
+        assertEquals(LEGACY_HASH,db.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,user));assertTrue(db.queryForObject("SELECT consultar FROM delegacoes_administrativas WHERE vinculo_id=?",Boolean.class,link));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM limites_gestao_permissoes",Integer.class));
+        assertEquals(7,db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+    }
+    @Test void falhaAuditoriaTambemReverteAdicionaisELimites() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");
+        jdbc.execute("ALTER TABLE auditoria_eventos ADD CONSTRAINT roles_fail_"+a.toString().replace("-","")+" CHECK (estabelecimento_id <> '"+a+"'::uuid OR tipo_evento NOT IN ('FUNCOES_ADICIONAIS_ALTERADAS','LIMITES_PERMISSOES_ALTERADOS')) NOT VALID");
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),0L)));
+        assertTrue(permissoes.painel(a,id(f),ownerEmail).adicionais().isEmpty());assertEquals(0L,service.consultar(a,id(f),ownerEmail).versao());
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->limitesNovos(List.of(id(f)),true,true,true,"PRODUTO_CONSULTAR"));
+        assertTrue(permissoes.capacidades(a,managerEmail).alvos().isEmpty());assertEquals(0L,service.consultar(a,managerLink,ownerEmail).versao());
+    }
+    @Test void executorDoJsonNaoSubstituiIdentidadeDaSessao() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");String base="/api/v1/estabelecimentos/"+a+"/permissoes/funcionarios/"+id(f);
+        mvc.perform(put(base+"/individuais/PRODUTO_CONSULTAR").session(managerSession).with(csrf()).contentType("application/json")
+            .content("{\"estado\":\"PERMITIR\",\"versao\":0,\"executor\":\""+owner+"\"}")).andExpect(status().isForbidden());
+        mvc.perform(put(base+"/individuais/PRODUTO_CONSULTAR").session(ownerSession).with(csrf()).contentType("application/json")
+            .content("{\"estado\":\"NEGAR\",\"versao\":0,\"executor\":\""+manager+"\"}")).andExpect(status().isOk());
+        assertEquals(owner,jdbc.queryForObject("SELECT usuario_id FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='PERMISSAO_INDIVIDUAL_ALTERADA'",UUID.class,a));
+    }
+    @Test void codigoDesconhecidoEAutoridadeExclusivaNaoAceitamExcecao() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");
+        assertEquals(400,statusOf(()->permissoes.excecao(a,id(f),"INVENTADA",ownerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L))));
+        for(String code:List.of("GERENTE_NOMEAR","PERMISSOES_INDIVIDUAIS_GERENCIAR","FUNCIONARIO_GERENCIAR"))
+            assertEquals(403,statusOf(()->permissoes.excecao(a,id(f),code,ownerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.PERMITIR,0L))));
+        assertEquals(0L,service.consultar(a,id(f),ownerEmail).versao());
+    }
+    @Test void revogacaoPrimeiroImpedeCadastroProtegidoNaSessaoExistente() throws Exception {
+        grant(true);
+        assertEquals(List.of(200,403),serializadas(()->estado(a,managerLink,"FUNCIONARIO_CADASTRAR",PermissoesDtos.Estado.NEGAR),()->service.cadastrar(a,managerEmail,UUID.randomUUID(),new Cadastro("Nao criar","ATENDENTE",null,null))));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM usuarios_estabelecimentos WHERE estabelecimento_id=? AND nome_exibicao='Nao criar'",Integer.class,a));
+    }
+    @Test void cadastroPrimeiroConfirmaAntesDaRevogacaoSemPerderHistorico() throws Exception {
+        grant(true);
+        assertEquals(List.of(200,200),serializadas(()->service.cadastrar(a,managerEmail,UUID.randomUUID(),new Cadastro("Criado antes","ATENDENTE",null,null)),()->estado(a,managerLink,"FUNCIONARIO_CADASTRAR",PermissoesDtos.Estado.NEGAR)));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='FUNCIONARIO_CADASTRADO' AND usuario_id=?",Integer.class,a,manager));
+        assertEquals(403,statusOf(()->service.cadastrar(a,managerEmail,UUID.randomUUID(),new Cadastro("Depois","ATENDENTE",null,null))));
+    }
+    @Test void alvoPromovidoAGerenteDeixaDeSerAdministravelPorDelegado() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),true,true,true,"PRODUTO_CONSULTAR");
+        service.funcao(a,id(f),ownerEmail,new Funcao("GERENTE",0L));
+        assertTrue(permissoes.alvos(a,managerEmail).isEmpty());assertEquals(403,statusOf(()->permissoes.painel(a,id(f),managerEmail)));
+        assertEquals(403,statusOf(()->permissoes.adicionais(a,id(f),managerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),1L))));
+        service.funcao(a,id(f),ownerEmail,new Funcao("ATENDENTE",1L));
+        assertEquals(403,statusOf(()->permissoes.painel(a,id(f),managerEmail)));
+    }
+    @Test void auditoriaDistingueGerenteExecutorEProprietarioAutorizador() throws Exception {
+        var f=create(a,"Pessoa","ATENDENTE");limitesNovos(List.of(id(f)),false,true,true,"PRODUTO_CONSULTAR");
+        permissoes.excecao(a,id(f),"PRODUTO_CONSULTAR",managerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,0L));
+        var event=jdbc.queryForMap("SELECT usuario_id,dados_evento::text AS dados FROM auditoria_eventos WHERE estabelecimento_id=? AND tipo_evento='PERMISSAO_INDIVIDUAL_ALTERADA'",a);
+        var data=json.readTree((String)event.get("dados"));assertEquals(manager,event.get("usuario_id"));
+        assertEquals(owner.toString(),data.get("depois").get("autorizador").asText());assertEquals(1L,data.get("depois").get("versaoAutorizacao").asLong());
+        assertEquals("APLICADA",data.get("depois").get("resultado").asText());
+    }
+    @Test void painelNaoApresentaPermissaoEfetivaParaVinculoInativo() {
+        grant(true);assertTrue(efetiva(a,managerLink,"FUNCIONARIO_CONSULTAR").efetiva());
+        service.situacao(a,managerLink,ownerEmail,new Situacao(false,1L));
+        assertTrue(permissoes.painel(a,managerLink,ownerEmail).permissoes().stream().noneMatch(PermissoesDtos.Efetiva::efetiva));
+    }
+    @Test void negacaoDeUnidadeTambemBloqueiaResultadoCentralDoGerente() {
+        grant(true);estado(a,managerLink,"ESTABELECIMENTO_VISUALIZAR",PermissoesDtos.Estado.NEGAR);
+        assertTrue(permissoes.painel(a,managerLink,ownerEmail).permissoes().stream().noneMatch(PermissoesDtos.Efetiva::efetiva));
+        assertFalse(permissoes.podeExistente(managerLink,"FUNCIONARIO_CADASTRAR"));
     }
 }

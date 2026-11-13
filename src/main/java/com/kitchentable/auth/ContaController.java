@@ -26,7 +26,7 @@ public class ContaController {
   return jdbc.query("SELECT e.id,e.nome,f.codigo AS funcao FROM estabelecimentos e " +
     "JOIN usuarios_estabelecimentos ue ON ue.estabelecimento_id=e.id " +
     "JOIN usuarios u ON u.id=ue.usuario_id JOIN funcoes f ON f.id=ue.funcao_id " +
-    "WHERE lower(u.email)=lower(?) AND u.ativo=true AND ue.ativo=true AND e.ativo=true ORDER BY e.nome",
+    "WHERE lower(u.email)=lower(?) AND u.ativo=true AND ue.ativo=true AND e.ativo=true AND (f.codigo='PROPRIETARIO' OR NOT EXISTS(SELECT 1 FROM usuarios_permissoes up JOIN permissoes p ON p.id=up.permissao_id WHERE up.vinculo_id=ue.id AND p.codigo='ESTABELECIMENTO_VISUALIZAR' AND NOT up.permitido)) ORDER BY e.nome",
     (rs,i)->Map.<String,Object>of("id",rs.getObject("id",UUID.class),"nome",rs.getString("nome"),"funcao",rs.getString("funcao")),auth.getName());
  }
 }

@@ -17,8 +17,9 @@ public class FuncionarioService {
     private final AutorizacaoAdministrativaService auth;
     private final AuditoriaAdministrativaService audit;
     private final ObjectMapper json;
-    public FuncionarioService(FuncionarioRepository repo,AutorizacaoAdministrativaService auth,AuditoriaAdministrativaService audit,ObjectMapper json) {
-        this.repo=repo;this.auth=auth;this.audit=audit;this.json=json;
+    private final PermissoesService permissoes;
+    public FuncionarioService(FuncionarioRepository repo,AutorizacaoAdministrativaService auth,AuditoriaAdministrativaService audit,ObjectMapper json,PermissoesService permissoes) {
+        this.repo=repo;this.auth=auth;this.audit=audit;this.json=json;this.permissoes=permissoes;
     }
     private AutorizacaoAdministrativaService.Administrador iniciar(UUID unidade,String email,String acao) {
         repo.bloquearUnidades(unidade);
@@ -76,10 +77,12 @@ public class FuncionarioService {
     }
     public Funcionario funcao(UUID unidade,UUID vinculo,String email,Funcao dto) {
         var ator=iniciar(unidade,email,"editar");var antes=repo.buscar(unidade,vinculo);auth.alvo(ator,antes);auth.funcaoPermitida(ator,dto.funcao());repo.verificarVersao(antes,dto.versao());
+        auth.exigirMudancaFuncao(ator);
         if(antes.funcao().equals(dto.funcao())) return antes;
         var delegacaoAntes=repo.delegacao(vinculo,antes.versao());
+        var permissoesAntes=permissoes.snapshot(vinculo);
         repo.funcao(unidade,vinculo,dto.funcao());var depois=repo.buscar(unidade,vinculo);
-        evento(unidade,ator,"FUNCAO_PRINCIPAL_ALTERADA",vinculo,Map.of("cadastro",antes,"delegacao",delegacaoAntes),depois);return depois;
+        evento(unidade,ator,"FUNCAO_PRINCIPAL_ALTERADA",vinculo,Map.of("cadastro",antes,"delegacao",delegacaoAntes,"permissoes",permissoesAntes),depois);return depois;
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Delegacao consultarDelegacao(UUID unidade,UUID vinculo,String email) {
