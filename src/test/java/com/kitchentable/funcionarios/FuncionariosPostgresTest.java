@@ -98,7 +98,7 @@ class FuncionariosPostgresTest {
         assertEquals(LEGACY_HASH,jdbc.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(LEGACY_EMAIL,jdbc.queryForObject("SELECT email FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(0L,jdbc.queryForObject("SELECT versao FROM usuarios_estabelecimentos WHERE id=?",Long.class,LEGACY_LINK));
-        assertEquals(7,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
+        assertEquals(8,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
         assertTrue(jdbc.queryForObject("SELECT version()",String.class).contains("PostgreSQL 16"));
         mvc.perform(get("/api/v1/auth/me").session(login(LEGACY_EMAIL))).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(LEGACY_USER.toString()));
     }
@@ -569,11 +569,14 @@ class FuncionariosPostgresTest {
         db.update("INSERT INTO delegacoes_administrativas(vinculo_id,consultar,funcoes) VALUES(?,true,ARRAY['ATENDENTE'])",link);
         db.update("INSERT INTO funcoes_permissoes(funcao_id,permissao_id) SELECT f.id,p.id FROM funcoes f CROSS JOIN permissoes p WHERE f.codigo='GERENTE' AND p.codigo='ESTABELECIMENTO_VISUALIZAR'");
         var before=db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
+        Flyway.configure().dataSource(ds).target("7").load().migrate();
+        var beforeV8=db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
         Flyway.configure().dataSource(ds).load().migrate();
+        assertEquals(beforeV8,db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4','5','6','7') ORDER BY installed_rank"));
         assertEquals(before,db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4') ORDER BY installed_rank"));
         assertEquals(LEGACY_HASH,db.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,user));assertTrue(db.queryForObject("SELECT consultar FROM delegacoes_administrativas WHERE vinculo_id=?",Boolean.class,link));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM limites_gestao_permissoes",Integer.class));
-        assertEquals(7,db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+        assertEquals(8,db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
     }
     @Test void falhaAuditoriaTambemReverteAdicionaisELimites() throws Exception {
         var f=create(a,"Pessoa","ATENDENTE");
@@ -635,4 +638,33 @@ class FuncionariosPostgresTest {
         assertTrue(permissoes.painel(a,managerLink,ownerEmail).permissoes().stream().noneMatch(PermissoesDtos.Efetiva::efetiva));
         assertFalse(permissoes.podeExistente(managerLink,"FUNCIONARIO_CADASTRAR"));
     }
+    void verificarConcorrenciaDiretaDeFuncoes(boolean principalPrimeiro) throws Exception {
+        var f=create(a,"Concorrencia SQL","ATENDENTE");UUID target=id(f);
+        Runnable principal=()->jdbc.update("UPDATE usuarios_estabelecimentos SET funcao_id=(SELECT id FROM funcoes WHERE codigo='BAR') WHERE id=?",target);
+        Runnable adicional=()->jdbc.update("INSERT INTO vinculos_funcoes_adicionais(vinculo_id,estabelecimento_id,funcao_id) SELECT ?,?,id FROM funcoes WHERE codigo='BAR'",target,a);
+        var pool=Executors.newFixedThreadPool(2);var primeiraPronta=new CountDownLatch(1);var liberar=new CountDownLatch(1);var pid=new CompletableFuture<Integer>();
+        try {
+            var x=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx->{
+                (principalPrimeiro?principal:adicional).run();primeiraPronta.countDown();
+                try{if(!liberar.await(15,TimeUnit.SECONDS))throw new IllegalStateException("Barreira excedida");}
+                catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+            }));
+            assertTrue(primeiraPronta.await(5,TimeUnit.SECONDS));
+            var y=pool.submit(()->{
+                try{new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(tx->{
+                    pid.complete(jdbc.queryForObject("SELECT pg_backend_pid()",Integer.class));(principalPrimeiro?adicional:principal).run();
+                });return 200;}catch(org.springframework.dao.DataIntegrityViolationException e){return 409;}
+            });
+            int backend=pid.get(5,TimeUnit.SECONDS);
+            for(int i=0;i<100&&!y.isDone();i++){
+                if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT cardinality(pg_blocking_pids(?))>0",Boolean.class,backend)))break;
+                Thread.sleep(20);
+            }
+            liberar.countDown();x.get(5,TimeUnit.SECONDS);int resultado=y.get(5,TimeUnit.SECONDS);
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM vinculos_funcoes_adicionais va JOIN usuarios_estabelecimentos ue ON ue.id=va.vinculo_id WHERE ue.id=? AND va.funcao_id=ue.funcao_id",Integer.class,target),"Principal e adicional nao podem coincidir mesmo com SQL concorrente");
+            assertEquals(409,resultado,"A segunda transacao deve rejeitar a combinacao inconsistente");
+        }finally{liberar.countDown();pool.shutdownNow();}
+    }
+    @Test void principalConcorrenteComAdicionalMantemIntegridadeNoBanco() throws Exception {verificarConcorrenciaDiretaDeFuncoes(true);}
+    @Test void adicionalConcorrenteComPrincipalMantemIntegridadeNoBanco() throws Exception {verificarConcorrenciaDiretaDeFuncoes(false);}
 }
