@@ -43,7 +43,7 @@ async function evaluate(expression) {
 }
 async function wait(expression, description) {
   for (let i = 0; i < 100; i++) { if (await evaluate(expression) && await evaluate("document.getElementById('employee-view')?.getAttribute('aria-busy')!=='true'")) return; await pause(150); }
-  const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState})").catch(() => ({}));
+  const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState,operationalHidden:document.getElementById('op-protected')?.hidden,operationalError:document.getElementById('op-error')?.textContent,operationalState:document.getElementById('op-state')?.textContent})").catch(() => ({}));
   console.log('DIAGNOSTIC:', JSON.stringify(diagnostic));
   throw new Error(`Tempo esgotado: ${description}`);
 }

@@ -53,6 +53,21 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   await cdp('Page.reload');await unlocked('Funcionario permissoes');
   if(!await evaluate("(async()=>{const m=await import('/assets/operacional.js');const v=m.createOperationalDrafts();v.bind('A:pessoa');v.set('rascunho',{texto:'teste descartavel'});v.lock();let negado=false;try{v.get('rascunho')}catch{negado=true}v.bind('A:pessoa');const preservado=v.get('rascunho').texto==='teste descartavel';v.bind('B:outra');return negado&&preservado&&v.get('rascunho')===undefined&&localStorage.length===0&&sessionStorage.length===0})()"))throw new Error('Isolamento dos rascunhos ou armazenamento incorreto');
   pass('PIN: login real, F5, tres resolucoes e rascunho em memoria isolado');
+  if(!await evaluate("(async()=>{const m=await import('/assets/operacional.js');const v=new Map();const storage={getItem:k=>v.get(k)||null,setItem:(k,x)=>v.set(k,x),removeItem:k=>v.delete(k)};const a=m.createOperationalLockState(storage);if(a.required)return false;a.require();if([...v.values()].some(x=>x!=='1'))return false;const b=m.createOperationalLockState(storage);if(!b.required)return false;b.confirmPin();return v.size===0&&m.createOperationalLockState(null).required})()"))throw new Error('Marca de bloqueio nao e booleana ou armazenamento indisponivel abre acesso');
+  await evaluate("document.querySelector('#op-protected button').focus();true");await pause(5200);
+  if(!await evaluate("document.activeElement===document.querySelector('#op-protected button')"))throw new Error('Polling removeu foco do teclado');
+  // Regressao: bloquear sem rede nao pode ser contornado por F5 ao reconectar.
+  await cdp('Network.enable');
+  await cdp('Network.emulateNetworkConditions',{offline:true,latency:0,downloadThroughput:-1,uploadThroughput:-1});
+  await evaluate("[...document.querySelectorAll('#op-protected button')].find(b=>b.textContent==='Bloquear agora').click();true");
+  await locked();await wait("!document.getElementById('op-error').hidden && !document.getElementById('op-enter').disabled",'bloqueio sem conexao');
+  await cdp('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1});
+  await cdp('Page.reload');await wait("document.getElementById('op-enter') && !document.getElementById('op-enter').disabled",'retorno da conexao');
+  await pause(500);
+  if(!await evaluate("document.getElementById('op-protected').hidden"))throw new Error('F5 contornou bloqueio que falhou por falta de rede');
+  if(await evaluate("(async()=>(await fetch('/api/v1/operacional/contexto')).status)()")!==423)throw new Error('Reconexao nao confirmou bloqueio no backend');
+  await login(targetLink,credential.pin);await unlocked('Funcionario permissoes');
+  pass('PIN: bloqueio offline permanece apos reconexao/F5 e exige novo PIN');
   // Nao gerar eventos de atividade: GET de verificacao nao deve renovar o prazo.
   await pause(31500);await locked();
   if(await evaluate("(async()=>(await fetch('/api/v1/operacional/contexto')).status)()")!==423)throw new Error('Backend aceitou sessao inativa');
@@ -70,10 +85,24 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   await login(targetLink,credential.pin);await unlocked('Funcionario permissoes');
   pass('PIN: bloqueio remoto, tres erros persistentes e desbloqueio autorizado com nova identificacao');
   await evaluate("[...document.querySelectorAll('#op-protected button')].find(b=>b.textContent==='Trocar operador').click();true");await locked();
-  await wait("!document.getElementById('op-enter').disabled",'troca de operador pronta');await login(fixture.managerVinculo,credential.secondPin);await unlocked('ZZZ Gerente de teste');
+  await wait("!document.getElementById('op-enter').disabled",'troca de operador pronta');if(!await evaluate("document.getElementById('op-person').value===''"))throw new Error('Troca manteve identidade anterior');await login(fixture.managerVinculo,credential.secondPin);await unlocked('ZZZ Gerente de teste');
   if(await evaluate("(async()=>(await fetch('/api/v1/estabelecimentos')).status)()")!==403)throw new Error('PIN de gerente elevou autenticacao administrativa');
+  // Outra aba usa o mesmo cookie; a aba anterior nao deve adotar o novo operador sem PIN.
+  const swapped=await evaluate(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();return(await fetch('/api/v1/operacional/entrar',{method:'POST',headers:{[c.headerName]:c.token,'Content-Type':'application/json'},body:JSON.stringify({estabelecimentoId:${JSON.stringify(fixture.estabelecimentoId)},identificacao:${JSON.stringify(targetLink)},pin:${JSON.stringify(credential.pin)}})})).status})()`);
+  if(swapped!==204)throw new Error('Simulacao de troca em outra aba rejeitada');
+  await locked();if(!await evaluate("document.getElementById('op-state').textContent.includes('outra aba')"))throw new Error('Troca em outra aba nao exigiu identificacao');
+  await login(fixture.managerVinculo,credential.secondPin);await unlocked('ZZZ Gerente de teste');
+  pass('PIN: mudanca de operador em outra aba nao substitui identidade exibida');
   const events=await security('/eventos');if(!events.body.some(e=>e.tipo==='OPERACIONAL_TROCA_OPERADOR')||!events.body.some(e=>e.tipo==='OPERACIONAL_TENTATIVAS_BLOQUEADO'))throw new Error('Auditoria operacional incompleta');
-  await evaluate("document.getElementById('op-exit').click();true");await wait("document.getElementById('op-enter') && !document.getElementById('op-enter').disabled",'logout operacional');await locked();
+  // Ordem deterministica: logout deve aguardar o login em voo e invalidar a sessao resultante.
+  await evaluate("[...document.querySelectorAll('#op-protected button')].find(b=>b.textContent==='Bloquear agora').click();true");await locked();await wait("!document.getElementById('op-enter').disabled",'preparar login concorrente');
+  await evaluate("window.ktNativeFetch=window.fetch;window.ktEntrySeen=false;window.ktLogoutSeen=false;window.fetch=async(input,options)=>{if(String(input).endsWith('/operacional/entrar')){window.ktEntrySeen=true;await new Promise(resolve=>window.ktReleaseEntry=resolve);}const r=await window.ktNativeFetch(input,options);if(String(input).endsWith('/auth/logout')){window.ktLogoutSeen=true;await new Promise(resolve=>window.ktReleaseLogout=resolve);}return r;};true");
+  await login(fixture.managerVinculo,credential.secondPin);await wait("window.ktEntrySeen===true",'login em voo');
+  await evaluate("document.getElementById('op-exit').click();true");await pause(250);
+  if(await evaluate("window.ktLogoutSeen"))throw new Error('Logout ultrapassou login pendente');
+  await evaluate("window.ktReleaseEntry();true");await wait("window.ktLogoutSeen===true",'logout posterior ao login');
+  await evaluate("window.ktReleaseLogout();true");await wait("document.getElementById('op-enter') && !document.getElementById('op-enter').disabled",'logout operacional');await locked();
+  pass('PIN: logout aguarda login pendente e encerra a sessao resultante');
   await cdp('Page.reload');await wait("document.getElementById('op-enter') && !document.getElementById('op-enter').disabled",'F5 apos logout operacional');
   if(await evaluate("(async()=>(await fetch('/api/v1/operacional/contexto')).status)()")!==401)throw new Error('Logout operacional nao encerrou autenticacao');
   pass('PIN: troca auditada, gerente sem elevacao e logout real');

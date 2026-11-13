@@ -37,7 +37,7 @@ export function createSecurityEditor({call,editor,finishForm,run,fail,generation
       const rows=await call('/eventos');if(current!==generation())return;const form=editor('Eventos de segurança operacional');
       form.append(el('p','Até 100 eventos recentes dentro do seu acesso. Bloqueios por tentativas ficam registrados para consulta do proprietário; envio de notificações ainda não está implementado.','muted small'));
       if(!rows.length)form.append(el('p','Nenhum evento permitido nesta unidade.'));
-      for(const row of rows){const card=el('article','','permission-card');card.append(el('strong',row.tipo.replace('OPERACIONAL_','').replaceAll('_',' ')),el('p',new Date(row.ocorridoEm).toLocaleString('pt-BR')));const details=el('details');details.append(el('summary','Identificadores do evento'),el('small',`Funcionário: ${row.funcionario||'Configuração da unidade'} · Executor: ${row.executor||'Sistema'}`,'muted'));card.append(details);form.append(card);}
+      for(const row of rows){const card=el('article','','permission-card');card.append(el('strong',row.tipo.replace('OPERACIONAL_','').replaceAll('_',' ')),el('p',new Date(row.ocorridoEm).toLocaleString('pt-BR')));const details=el('details');details.append(el('summary','Identificadores do evento'),el('small',`Funcionário: ${row.funcionario||'Configuração da unidade'} · Executor: ${row.executor||'Não identificado'}`,'muted'));card.append(details);form.append(card);}
       finishForm(form,()=>{});form.querySelector('button[type=submit]').remove();
     }catch(e){if(current===generation())fail(e);}
   }
