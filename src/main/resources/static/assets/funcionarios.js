@@ -1,3 +1,4 @@
+import { createSecurityEditor } from './seguranca-operacional.js';
 import { createPermissionsEditor } from './permissoes.js';
 const roles = { ATENDENTE: 'Atendente', CAIXA: 'Caixa', COZINHA: 'Cozinha', BAR: 'Bar', GERENTE: 'Gerente' };
 const common = ['ATENDENTE', 'CAIXA', 'COZINHA', 'BAR'];
@@ -20,6 +21,13 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     return api(destination, { method, headers: { [csrf.headerName]: csrf.token, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   }
   const permissionsEditor = createPermissionsEditor({ call: permissionCall, editor, finishForm, run, fail, generation: () => generation, rows: () => rows, refresh: () => load(generation) });
+  let securityCapabilities={gerenciarPin:false,desbloquear:false,configurar:false,eventos:false};
+  async function securityCall(suffix,method='GET',data){
+    const destination=`estabelecimentos/${encodeURIComponent(unit)}/seguranca-operacional${suffix}`;
+    if(method==='GET')return api(destination);const csrf=await api('auth/csrf');
+    return api(destination,{method,headers:{[csrf.headerName]:csrf.token,'Content-Type':'application/json'},body:JSON.stringify(data)});
+  }
+  const securityEditor=createSecurityEditor({call:securityCall,editor,finishForm,run,fail,generation:()=>generation,refresh:()=>load(generation),capabilities:()=>securityCapabilities,getUnit:()=>unit});
   let editorTrigger = null;
   function restoreFocus(key) {
     const candidate = key && root.querySelector(`[data-focus="${CSS.escape(key)}"]`);
@@ -91,7 +99,7 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     finishForm(form, () => run(() => request(row ? `/${row.vinculoId}` : '', row ? 'PATCH' : 'POST', {
       nome: name.value.trim(), emailContato: email.value.trim() || null, telefone: phone.value.trim() || null,
       ...(row ? { versao: row.versao } : { funcao: role.value }),
-    }, row ? null : key), row ? 'Dados locais atualizados.' : 'Funcionário cadastrado. O acesso por PIN pertence à Entrega 2.3.'));
+    }, row ? null : key), row ? 'Dados locais atualizados.' : 'Funcionário cadastrado. Defina um PIN em Segurança operacional para liberar o acesso.'));
   }
   function changeRole(row) {
     const form = editor('Alterar função principal'); const role = select(form, 'funcao', 'Função nesta unidade', capabilities.funcoes, row.funcao);
@@ -141,8 +149,10 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     const head = el('div', '', 'section-heading'); const intro = el('div'); intro.append(el('span', 'EQUIPE DO ESTABELECIMENTO', 'eyebrow'), el('h2', 'Funcionários'));
     const actions = el('div', '', 'employee-actions'); actions.append(button('Atualizar', () => { if (!busy) activate(unit); }));
     if (capabilities.cadastrar && capabilities.funcoes.length) actions.append(button('Nova pessoa', () => edit(), 'primary'));
+    if(securityCapabilities.configurar)actions.append(button('Inatividade operacional',()=>securityEditor.policy()));
+    if(securityCapabilities.eventos)actions.append(button('Eventos de segurança',()=>securityEditor.events()));
     head.append(intro, actions); root.append(head);
-    root.append(el('p', 'Cadastros e vínculos reais desta unidade. O PIN e o acesso operacional serão disponibilizados na Entrega 2.3. Credenciais administrativas existentes são preservadas.', 'muted small'));
+    root.append(el('p', 'Cadastros e vínculos desta unidade. Defina o PIN individual em Segurança operacional; credenciais administrativas existentes são preservadas.', 'muted small'));
     const msg = el('p'); msg.dataset.message = ''; msg.setAttribute('role', 'status'); msg.hidden = true; root.append(msg);
     const slot = el('section', '', 'employee-editor'); slot.dataset.editor = ''; slot.hidden = true; root.append(slot);
     if (!capabilities.consultar && !permissionCapabilities.proprietario && !permissionCapabilities.alvos.length) root.append(el('p', 'Seu acesso não permite listar a equipe. As demais ações também são validadas no servidor.', 'muted'));
@@ -173,6 +183,7 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
           if (capabilities.proprietario && row.funcao === 'GERENTE') controls.append(button('Limites do gerente', () => delegation(row)));
           if (permissionCapabilities.proprietario || (common.includes(row.funcao) && permissionCapabilities.alvos.includes(row.vinculoId))) controls.append(button('Funções e permissões', () => permissionsEditor.open(row)));
           if (permissionCapabilities.proprietario && row.funcao === 'GERENTE') controls.append(button('Delegar gestão de permissões', () => permissionsEditor.limits(row)));
+          if (manageRow && (securityCapabilities.gerenciarPin||securityCapabilities.desbloquear)) controls.append(button('Segurança operacional',()=>securityEditor.open(row)));
           if (capabilities.associar && row.ativo && manageRow) controls.append(button('Associar a outra unidade', () => associate(row)));
           controls.querySelectorAll('button').forEach((b) => { b.setAttribute('aria-label', `${b.textContent}: ${row.nome}`); b.dataset.focus = `${row.vinculoId}:${b.textContent}`; });
           if (!controls.children.length) controls.append(el('span', 'Sem ações autorizadas', 'muted'));
@@ -197,11 +208,12 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
   async function load(current) {
     const c = await request('/capacidades'); if (current !== generation) return;
     const pc = await permissionCall('/capacidades'); if (current !== generation) return;
+    const sc = await securityCall('/capacidades'); if (current !== generation) return;
     const [legacy, delegated, incoming] = await Promise.all([c.consultar ? request('') : Promise.resolve([]), permissionCall('/alvos'), c.associar ? request('/associacoes') : Promise.resolve([])]);
     const employees = [...new Map([...legacy, ...delegated].map(row => [row.vinculoId, row])).values()];
     if (current !== generation) return;
     if (!Array.isArray(employees) || !Array.isArray(incoming) || !Array.isArray(c.funcoes)) throw new Error('Resposta inválida');
-    capabilities = c; permissionCapabilities = pc; rows = employees; requests = incoming; render();
+    capabilities = c; permissionCapabilities = pc; securityCapabilities = sc; rows = employees; requests = incoming; render();
   }
   async function activate(id) {
     reset(); unit = id || null; const current = generation;

@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
+import { smokeOperational } from './smoke-operacional.mjs';
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const tools = path.resolve('.tools');
 const artifacts = path.join(tools, 'browser-artifacts');
@@ -13,6 +14,7 @@ const rawClasspath = report.match(/<property name="java.class.path" value="([^"]
 if (!rawClasspath) throw new Error('Execute Maven verify antes do smoke.');
 const classpath = rawClasspath.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 const credential = { email: `browser-${crypto.randomUUID()}@example.com`, password: crypto.randomUUID(), managerEmail: `manager-${crypto.randomUUID()}@example.com`, managerPassword: crypto.randomUUID() };
+credential.pin=String(crypto.randomInt(0,1000000)).padStart(6,'0');credential.secondPin=String(crypto.randomInt(0,1000000)).padStart(6,'0');
 const java = spawn('java', ['-cp', classpath, 'com.kitchentable.funcionarios.FuncionariosBrowserFixture'], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
 java.stderr.on('data', () => {}); // Nunca encaminhar ambiente/credenciais ou logs brutos.
 const lines = readline.createInterface({ input: java.stdout });
@@ -79,7 +81,7 @@ try {
     const data = JSON.parse(event.data);
     if (data.method === 'Runtime.exceptionThrown') {
       const error = data.params.exceptionDetails.exception;
-      const safe = String(error?.description || data.params.exceptionDetails.text).split('\n')[0].replaceAll(credential.email, '[fixture]').replaceAll(credential.password, '[fixture]').replaceAll(credential.managerEmail, '[fixture]').replaceAll(credential.managerPassword, '[fixture]');
+      const safe = String(error?.description || data.params.exceptionDetails.text).split('\n')[0].replaceAll(credential.email, '[fixture]').replaceAll(credential.password, '[fixture]').replaceAll(credential.managerEmail, '[fixture]').replaceAll(credential.managerPassword, '[fixture]').replaceAll(credential.pin, '[fixture]').replaceAll(credential.secondPin, '[fixture]');
       console.log('BROWSER_ERROR:', safe);
     }
     const item = pending.get(data.id); if (!item) return;
@@ -262,11 +264,13 @@ try {
   await evaluate("var card=document.querySelector('[data-code=PRODUTO_CONSULTAR]');card.querySelector('button').click();true");
   await wait("document.querySelector('[data-message]')?.classList.contains('error') && !document.querySelector('.permission-card')",'revogacao com editor aberto');
   if (!(await evaluate("![...document.querySelectorAll('.employee-table button')].some(b=>b.textContent==='Funções e permissões')")))throw new Error('Controles revogados permaneceram');
-  ownerSocket.close();await browserCommand('Target.disposeBrowserContext',{browserContextId:context.browserContextId});
+
   pass('permissoes: backend bloqueia gerente, concessao e revogacao em sessao aberta');
   // Voltar ao proprietario para repetir o logout/senha incorreta originais.
   await evaluate(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();await fetch('/api/v1/auth/logout',{method:'POST',headers:{[c.headerName]:c.token}});const fresh=await(await fetch('/api/v1/auth/csrf')).json();return(await fetch('/api/v1/auth/login',{method:'POST',headers:{[fresh.headerName]:fresh.token},body:new URLSearchParams({email:${JSON.stringify(credential.email)},password:${JSON.stringify(credential.password)}})})).status})()`);
   await cdp('Page.reload');await wait("!document.getElementById('app-view').hidden",'retorno ao proprietario');
+  await smokeOperational({fixture,targetLink,credential,cdp,evaluate,wait,press,pause,pass,ownerEval,artifacts,fs,path});
+  ownerSocket.close();await browserCommand('Target.disposeBrowserContext',{browserContextId:context.browserContextId});
   await evaluate("document.getElementById('logout').click();true");
   await wait("document.getElementById('app-view').hidden && !document.getElementById('login-view').hidden", 'logout');
   await cdp('Page.reload');
