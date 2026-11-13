@@ -1,82 +1,86 @@
 # KITCHEN & TABLE 2.0
 
-SaaS de gestão para restaurantes, bares e lanchonetes, em desenvolvimento por etapas.
+SaaS de gestão para restaurantes, bares e lanchonetes, desenvolvido por entregas e com autorização por estabelecimento.
 
-Etapa 1 e Entrega 2.1 estão integradas à develop. Esta feature acrescenta a Entrega 2.2: funções adicionais, permissões e delegações controladas, para revisão. Não é uma versão pronta para produção.
+## Situação do desenvolvimento
 
-**Antes de executar esta feature com dados existentes, leia [o plano de migrações e testes](docs/entrega-2-1.md). Não iniciar contra o PostgreSQL operacional sem aprovação específica de backup/migração.**
+Etapa 1 e Entregas 2.1/2.2 estão integradas à `develop`. A Entrega 2.3, PIN e segurança operacional, está em revisão na branch `feature/entrega-2-3-pin-seguranca`, PR #5. Ainda não é uma versão de produção. A Entrega 2.4 e os módulos operacionais futuros não foram iniciados.
 
-## Arquitetura implementada
+Implementado nesta branch:
 
-- Java 17, Spring Boot 3.3.13 e Maven.
-- Spring Security com sessão HTTP, CSRF e BCrypt.
-- PostgreSQL 16, JdbcTemplate/JDBC e migrações Flyway.
-- Frontend HTML, CSS responsivo e JavaScript nativo em `src/main/resources/static`, servido pela mesma aplicação.
-- Docker Compose somente para o PostgreSQL local.
+- Login administrativo por sessão, CSRF, BCrypt, restauração da autenticação após F5 e logout com invalidação no servidor.
+- Dashboard com identificação real do usuário, estabelecimentos e função, sem indicadores fictícios.
+- Gestão de funcionários, identidades, vínculos independentes por unidade e associação controlada.
+- Função principal, funções adicionais, exceções individuais, delegações administrativas e auditoria.
+- PIN operacional por vínculo, bloqueio persistente após tentativas incorretas, desbloqueio/redefinição autorizados, inatividade e troca de operador.
 
-Angular, JWT, JPA, WebSockets e operação offline não fazem parte desta implementação. O texto anterior de planejamento foi preservado integralmente em [docs/README-planejamento-original.md](docs/README-planejamento-original.md); não representa o estado atual nem substitui as decisões de negócio aprovadas. [docs/prompt-master.md](docs/prompt-master.md) foi preservado como recebido, mas está vazio.
+O catálogo de permissões de produtos, pedidos, caixa e outros módulos futuros não representa operações disponíveis. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
 
-## Funcionalidades disponíveis
+Pendências de interface relatadas incluem restaurar a seção/unidade após F5, preservar rascunhos elegíveis e melhorar a organização das permissões. O [planejamento das correções](docs/planejamento-correcoes-interface.md) não autoriza nem representa sua implementação.
 
-- Login com usuário existente; identificação de nome, e-mail, estabelecimento e função.
-- Dashboard com dados reais da API, sem indicadores fictícios.
-- Consulta e seleção de estabelecimentos vinculados.
-- Permanência da sessão após F5, logout com invalidação no servidor e expiração por inatividade.
-- Cookie HttpOnly/SameSite=Lax, CSRF no login/logout e HTTP Basic desabilitado.
-- Navegação para módulos futuros, sinalizados como em desenvolvimento.
+## Tecnologias
 
-Cadastro/gestão de funcionários, vínculos, associação controlada, funções adicionais e permissões administrativas estão implementados. O catálogo operacional/financeiro representa contratos futuros, sem operações habilitadas. PIN, temporários, produtos, mesas, comandas, pedidos, cozinha, bar, estoque, caixa e relatórios continuam pendentes.
+Java 17, Spring Boot 3.3.13, Spring Security, JDBC/JdbcTemplate, PostgreSQL 16, Flyway e Maven. Frontend HTML/CSS/JavaScript nativo, servido pelo Spring Boot. Docker é usado para PostgreSQL local e fixtures descartáveis; Node e Chrome são necessários para o smoke, sem dependências npm.
 
-## Executar localmente no Windows
+## Estrutura
 
-Pré-requisitos: Java 17, Maven e Docker Desktop. Na raiz do clone, em PowerShell, configure `DB_PASSWORD` com a senha do banco que será utilizado. Para evitar gravá-la no histórico, use entrada oculta:
+```text
+src/main/java/com/kitchentable/   backend e autorização
+src/main/resources/
+  application.yml              configuração por ambiente
+  db/migration/                migrações Flyway V1–V10
+  static/                      telas HTML e assets CSS/JavaScript
+src/test/java/                 testes Java e fixtures descartáveis
+scripts/                       smoke automatizado de interface
+.github/                       CI, Dependabot e template de PR
+docs/                          documentação e índice por assunto
+tests/manual/                  guia; materiais de execução locais ignorados
+.tools/                        ferramentas, perfis e privados locais ignorados
+target/                        saídas Maven ignoradas
+```
+
+Consulte o [guia da estrutura](docs/estrutura-projeto.md), o [índice da documentação](docs/README.md) e as [orientações de contribuição](CONTRIBUTING.md).
+
+## Instalação e execução local
+
+Pré-requisitos: Java 17, Maven e Docker Desktop. Para smoke: Node 24 e Chrome instalado. Execute os comandos na raiz do clone.
+
+**Esta feature aplica migrações até V10 ao iniciar. Não execute contra o PostgreSQL operacional.** Use somente um banco local novo explicitamente destinado ao desenvolvimento ou as fixtures descartáveis. Veja [instalação e variáveis](docs/instalacao-local.md) e [compatibilidade das migrações](docs/entrega-2-3.md).
+
+Somente para uma instalação local genuinamente nova, sem conflito de porta/volume com outros bancos:
 
 ```powershell
-$senhaBancoLocal = Read-Host 'Senha do PostgreSQL local' -AsSecureString
+$senhaBancoLocal = Read-Host 'Senha exclusiva do novo PostgreSQL de desenvolvimento' -AsSecureString
 $env:DB_PASSWORD = [System.Net.NetworkCredential]::new('', $senhaBancoLocal).Password
+docker compose up -d db
 mvn spring-boot:run
 ```
 
-Abra http://localhost:8080. A aplicação fica vinculada a 127.0.0.1 por padrão. Não há publicação da aplicação na internet neste procedimento.
+Abra http://127.0.0.1:8080. O servidor e a porta publicada do banco ficam em loopback por padrão. Não há senha padrão no código; o `.env` do Compose não é carregado automaticamente pelo Spring Boot. Não remova volumes nem use esse procedimento para recriar um banco existente.
 
-**Banco já existente:** não executar esta feature contra o PostgreSQL operacional. Flyway aplicaria V5–V8 no startup. Migração real exige aprovação específica, backup e restauração ensaiada. Para validar a entrega, utilize os testes descartáveis descritos em docs/entrega-2-2.md. Não execute setup novamente para contas já cadastradas.
+A criação do primeiro proprietário em banco novo é descrita no [setup técnico](docs/configuracao-inicial.md); não é um fluxo público do site. Não repetir setup para cadastros existentes.
 
-**Instalação realmente nova:** depois de configurar DB_PASSWORD, `docker compose up -d db` cria o banco local. O setup único é descrito em [docs/configuracao-inicial.md](docs/configuracao-inicial.md). Não o execute para o proprietário já cadastrado.
-
-Não há senha padrão do banco no código. Um arquivo .env do Compose não é carregado automaticamente pelo Spring Boot. Nunca envie senhas, chaves de setup, arquivos .env, dumps ou volumes ao GitHub.
+O ambiente manual já preparado usa seus próprios scripts privados: [organização dos testes](docs/organizacao-testes.md). Não reiniciá-lo com Compose ou `mvn spring-boot:run`.
 
 ## Testes
 
-```powershell
-mvn test
-```
-
-Os testes conectam somente a PostgreSQL 16 descartável para as Entregas 2.1 e 2.2; os testes anteriores usam mocks/Tomcat isolado. Docker é necessário, sem acesso ao banco operacional. A expiração usa Tomcat real em porta aleatória de loopback e timeout de dois segundos somente no contexto de teste; o prazo normal permanece 30 minutos.
-
-Para executar somente a expiração:
+Com Docker em execução:
 
 ```powershell
-mvn '-Dtest=SessionInactivityIntegrationTest' test
+mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.springframework=INFO' verify
+node scripts/smoke-funcionarios.mjs
 ```
 
-O frontend não exige Node para executar. Com Node instalado, `node --check src/main/resources/static/assets/app.js` verifica a sintaxe.
+O Maven compila, testa e empacota. A suíte atual contém **137 testes**, incluindo mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
+
+A expiração automatizada pode ser executada separadamente com `mvn '-Dtest=SessionInactivityIntegrationTest' test`; o prazo reduzido existe somente no teste. O prazo administrativo normal permanece 30 minutos.
+
+Os testes manuais mantêm **53 aprovações conciliadas** e pendências **T38, T50, T51 e T57**. Isso é independente da aprovação automatizada. Roteiro, CSV, conciliação, relatórios e capturas ficam em `tests/manual/etapa-2.3/`, somente locais e ignorados pelo Git. Consulte os [guias dos testes](docs/organizacao-testes.md) e [scripts](scripts/README.md).
 
 ## Segurança e limites
 
-Sessões estão na memória do servidor e se encerram ao reiniciar. Antes de produção será necessário revisar HTTPS, cookie Secure (`KT_COOKIE_SECURE=true` em HTTPS), infraestrutura, atualizações de dependências, permissões por estabelecimento, revogação de sessões e proteção contra tentativas repetidas. O HTTP local usa cookie sem Secure por necessidade de desenvolvimento.
+Sessão administrativa em memória, cookie HttpOnly/SameSite=Lax, proteção CSRF e HTTP Basic desabilitado. Senhas e PINs não são guardados no armazenamento do navegador. Reiniciar o backend encerra as sessões administrativas.
 
-Credenciais nos testes são sintéticas e usadas exclusivamente com dependências simuladas ou PostgreSQL descartável. Não representam contas operacionais. A exceção de CSRF do setup permanece limitada ao endpoint protegido pela chave externa e pelo bloqueio de inicialização única; a interface não utiliza esse endpoint.
+Antes de piloto: revisar HTTPS/cookie Secure, infraestrutura, sessões em múltiplas instâncias, proteção contra tentativas em massa, retenção de auditoria, dependências e as pendências documentadas. HTTP é somente local; os testes não aprovam implantação de produção. Consulte [SECURITY.md](SECURITY.md) e [Entrega 2.3](docs/entrega-2-3.md).
 
-## Documentação e versionamento
-
-- [Entrega 2.2: funções e permissões](docs/entrega-2-2.md)
-- [Entrega 2.1: funcionalidades, segurança e migrações](docs/entrega-2-1.md)
-- [Autenticação por sessão](docs/autenticacao-sessao.md)
-- [Situação da Etapa 1 e evidências](docs/etapa-1.md)
-- [Fluxo de branches e propostas de PR](docs/fluxo-publicacao.md)
-
-Fluxo desta entrega: `feature/entrega-2-2-funcoes-permissoes` → `develop`; promoção à `main` exige autorização separada. Publicação exige autorização; merges não são automáticos. A publicação do código no GitHub não é implantação do SaaS.
-
-## Entrega 2.2 em revisão
-
-Funções adicionais, catálogo, exceções individuais, limites de gerente e interface real estão nesta feature. Consulte [docs/entrega-2-2.md](docs/entrega-2-2.md). Não iniciar a aplicação contra o PostgreSQL operacional antes de autorização específica de migração. PIN e operações dos módulos futuros continuam pendentes.
+Nunca publique credenciais, `.env`, tokens, perfis Chrome, relatórios privados, capturas, dumps ou volumes de banco. Publicar código no GitHub não implanta o SaaS. Merge em `develop` ou `main` depende de autorização separada.

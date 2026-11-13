@@ -45,12 +45,12 @@ public class FuncionarioRepository {
         return rows.get(0);
     }
     private static final String SELECT="SELECT ue.id AS vinculo_id,u.id AS usuario_id,COALESCE(ue.nome_exibicao,u.nome) AS nome,"+
-        "ue.email_contato,ue.telefone,f.codigo,ue.ativo,ue.versao FROM usuarios_estabelecimentos ue " +
+        "ue.email_contato,ue.telefone,f.codigo,ue.ativo,ue.versao,EXISTS(SELECT 1 FROM credenciais_operacionais co WHERE co.vinculo_id=ue.id) AS acesso_operacional FROM usuarios_estabelecimentos ue " +
         "JOIN usuarios u ON u.id=ue.usuario_id JOIN funcoes f ON f.id=ue.funcao_id ";
     private Funcionario map(ResultSet rs,int n) throws SQLException {
         return new Funcionario(rs.getObject("vinculo_id",UUID.class),rs.getObject("usuario_id",UUID.class),
             rs.getString("nome"),rs.getString("email_contato"),rs.getString("telefone"),rs.getString("codigo"),
-            rs.getBoolean("ativo"),rs.getLong("versao"),false);
+            rs.getBoolean("ativo"),rs.getLong("versao"),rs.getBoolean("acesso_operacional"));
     }
     Funcionario buscar(UUID estabelecimento, UUID vinculo) {
         var rows=jdbc.query(SELECT+"WHERE ue.estabelecimento_id=? AND ue.id=? AND u.ativo=true",this::map,estabelecimento,vinculo);
@@ -88,8 +88,13 @@ public class FuncionarioRepository {
             dto.nome().trim(),normalizar(dto.emailContato()),normalizar(dto.telefone()),vinculo,unidade);
     }
     static String normalizar(String value) { return value==null||value.isBlank()?null:value.trim(); }
-    void situacao(UUID unidade,UUID vinculo,boolean ativo) {
+    int situacao(UUID unidade,UUID vinculo,boolean ativo) {
         jdbc.update("UPDATE usuarios_estabelecimentos SET ativo=?,versao=versao+1,atualizado_em=now() WHERE id=? AND estabelecimento_id=?",ativo,vinculo,unidade);
+        if(!ativo){
+            jdbc.update("UPDATE credenciais_operacionais SET versao=versao+1 WHERE vinculo_id=?",vinculo);
+            return jdbc.update("UPDATE sessoes_operacionais SET bloqueada=true,encerrada=true WHERE vinculo_id=? AND NOT encerrada",vinculo);
+        }
+        return 0;
     }
     void funcao(UUID unidade,UUID vinculo,String codigo) {
         jdbc.update("DELETE FROM vinculos_funcoes_adicionais WHERE vinculo_id=? AND funcao_id=(SELECT id FROM funcoes WHERE codigo=?)",vinculo,codigo);

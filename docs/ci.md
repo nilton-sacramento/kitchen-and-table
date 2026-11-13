@@ -14,11 +14,11 @@ Dispara em PRs para develop/main e em pushes para main, develop, feature/**, fix
 
 Runner ubuntu-latest, Temurin Java 17, Node 24 e Maven verify: sintaxe JavaScript, compilação, testes e empacotamento. Actions fixadas por SHA completo para segurança da cadeia de dependências; esses SHAs não são commits fixos do produto. Dependabot está preparado para propor atualizações dessas Actions.
 
-Token contents: read; checkout sem persistir credenciais; sem secrets, pull_request_target ou acesso ao banco local/produção. Não imprime ambiente nem publica os relatórios XML de testes. Logs Spring em INFO. Os 18 testes anteriores usam mocks/Tomcat em loopback; os 40 testes da Entrega 2.1 (30 iniciais e 10 da revisão) usam PostgreSQL 16 descartável via Testcontainers. Não há banco externo ou dado operacional. O smoke obrigatório usa outro banco descartável e Chrome isolado para validar frontend real; veja docs/entrega-2-1.md.
+Token contents: read; checkout sem persistir credenciais; sem secrets, pull_request_target ou acesso ao banco local/produção. Não imprime ambiente nem publica os relatórios XML de testes. Logs Spring em INFO. A suíte atual contém 137 testes: a base de autenticação usa mocks/Tomcat em loopback e as integrações de funcionários, permissões e PIN usam PostgreSQL 16 descartável via Testcontainers. Não há banco externo ou dado operacional. O smoke obrigatório usa outro banco descartável e Chrome isolado para validar frontend real; veja docs/entrega-2-1.md.
 
 ## Histórico da transição
 
-O PR #2 foi integrado em develop por autorização, no merge commit 30f788a661e3c72017b1099b62d23cf04c2e95ea. Seu CI passou ainda com o bootstrap, necessário porque aquela branch não tinha backend. Depois, develop foi incorporada na feature com merge commit e o template definitivo foi ativado no próprio PR #1. Posteriormente, o PR #1 foi integrado na develop em bb34935, e o PR #3 da Entrega 2.1 em 2c4108a, com CI aprovado. A Entrega 2.2 continua sujeita a PR Draft e revisão própria.
+O PR #2 foi integrado em develop por autorização, no merge commit 30f788a661e3c72017b1099b62d23cf04c2e95ea. Seu CI passou ainda com o bootstrap, necessário porque aquela branch não tinha backend. Depois, develop foi incorporada na feature com merge commit e o template definitivo foi ativado no próprio PR #1. Posteriormente, o PR #1 foi integrado na develop em bb34935, e o PR #3 da Entrega 2.1 em 2c4108a, com CI aprovado. A Entrega 2.2 foi integrada pelo PR #4 em develop no commit 35f1568. A Entrega 2.3 permanece em revisão no PR #5.
 
 O arquivo .github/ci-templates/ci-sem-bootstrap.yml permanece como referência da transição, fora dos workflows ativos. O workflow atual já é a versão sem bootstrap. Os registros anteriores de execuções em bootstrap são evidências históricas, não o comportamento atual desta branch.
 
@@ -35,6 +35,6 @@ node --check src/main/resources/static/assets/app.js
 mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.springframework=INFO' verify
 ```
 
-Testes não exigem DB_PASSWORD ou banco operacional. Para executar a aplicação com dados existentes, configurar DB_PASSWORD e manter o contêiner original conforme README; não repetir setup nem recriar volumes.
+Testes não exigem DB_PASSWORD ou banco operacional. Para executar a aplicação, seguir docs/instalacao-local.md somente com ambiente de desenvolvimento autorizado. Não iniciar esta feature contra o banco operacional nem repetir setup ou recriar volumes.
 
-A feature da Entrega 2.2 amplia a suíte e o smoke para funções e permissões; o total real e o SHA validado devem ser consultados no PR. A validação inclui o novo assets/permissoes.js e V1→V7/V4→V7 somente em PostgreSQL 16 descartável.
+A feature da Entrega 2.3 amplia a validação para PIN e segurança operacional, com migrações até V10 exclusivamente nas fixtures PostgreSQL 16 descartáveis. O smoke principal inclui scripts/smoke-operacional.mjs. O total efetivamente executado e o SHA devem ser conferidos no CI do commit atual; registros históricos de totais menores permanecem nos relatórios das entregas.
