@@ -1,5 +1,8 @@
 # Proteções do GitHub — regras e limites
 
+Este documento preserva recomendações e o estado registrado na preparação inicial. As referências a PRs #1/#2 e à instalação do primeiro CI são históricas. Consulte [o CI atual](ci.md) e [o fluxo de contribuição](../CONTRIBUTING.md). Configuração atual de proteção exige verificação no GitHub; a presença deste texto não comprova que todas as opções continuam ativas.
+
+
 main e develop devem integrar alterações por PR, bloquear force push/exclusão e manter resolução de conversas. Para trabalho individual, não exigir aprovação de outra pessoa: required_approving_review_count = 0, mantendo a revisão pelo proprietário e o checklist. Não ativar exigência de CODEOWNERS ou aprovação do último push sem combinar colaboradores.
 
 Quando as permissões permitirem, exigir PR e aplicar a regra aos administradores, sem bypass de usuários/apps desnecessário. Não criar restrições de push por pessoa que impeçam o único proprietário de operar. Não exigir assinatura de commits ou merge queue sem preparação própria.
