@@ -226,12 +226,25 @@ try {
   const ownerLogin=await ownerEval(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();return(await fetch('/api/v1/auth/login',{method:'POST',headers:{[c.headerName]:c.token},body:new URLSearchParams({email:${JSON.stringify(credential.email)},password:${JSON.stringify(credential.password)}})})).status})()`);
   if(ownerLogin!==204)throw new Error('Login isolado do proprietario rejeitado');
   async function ownerApi(suffix, method='GET', body){return ownerEval(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();const r=await fetch(${JSON.stringify(permBase)}+${JSON.stringify(suffix)},{method:${JSON.stringify(method)},headers:{[c.headerName]:c.token,'Content-Type':'application/json'},${body===undefined?'':`body:JSON.stringify(${JSON.stringify(body)}),`} });return {status:r.status,body:await r.json()}})()`);}
-  const managerPanel=await ownerApi(`/funcionarios/${fixture.managerVinculo}`);const granted=await ownerApi(`/funcionarios/${fixture.managerVinculo}/limites`,'PUT',{adicionais:true,alvos:[targetLink],permissoes:[{codigo:'PRODUTO_CONSULTAR',conceder:true,revogar:true}],versao:managerPanel.body.versao});if(granted.status!==200)throw new Error('Delegacao explicita rejeitada');
+  const managerPanel=await ownerApi(`/funcionarios/${fixture.managerVinculo}`);const granted=await ownerApi(`/funcionarios/${fixture.managerVinculo}/limites`,'PUT',{adicionais:true,alvos:[targetLink],permissoes:[{codigo:'PRODUTO_CONSULTAR',conceder:true,revogar:false}],versao:managerPanel.body.versao});if(granted.status!==200)throw new Error('Delegacao explicita rejeitada');
   await evaluate("[...document.querySelectorAll('#employee-view button')].find(b=>b.textContent==='Atualizar').click();true");
   await wait("[...document.querySelectorAll('.employee-table button')].some(b=>b.textContent==='Funções e permissões')",'limites recebidos em sessao aberta');await permissionPanel();
+  if (!(await evaluate("document.querySelector('[data-code=PRODUTO_CONSULTAR] select').value==='HERDAR' && document.querySelector('[data-code=PRODUTO_CONSULTAR] button').disabled"))) throw new Error('Aplicar excecao habilitado para HERDAR sem autoridade para restaurar heranca.');
+  await evaluate("var permissionSelect=document.querySelector('[data-code=PRODUTO_CONSULTAR] select');permissionSelect.value='PERMITIR';permissionSelect.dispatchEvent(new Event('change'));true");
+  if (!(await evaluate("!document.querySelector('[data-code=PRODUTO_CONSULTAR] button').disabled"))) throw new Error('Acao permitida permaneceu desabilitada.');
+  pass('permissoes: gerente com conceder sem revogar nao pode aplicar HERDAR pela interface');
+  await evaluate("document.querySelector('.permission-form select').focus();true");await press('Escape','Escape',27);
+  const revokeOnlyManager=await ownerApi(`/funcionarios/${fixture.managerVinculo}`);
+  const revokeOnly=await ownerApi(`/funcionarios/${fixture.managerVinculo}/limites`,'PUT',{adicionais:true,alvos:[targetLink],permissoes:[{codigo:'PRODUTO_CONSULTAR',conceder:false,revogar:true}],versao:revokeOnlyManager.body.versao});
+  if(revokeOnly.status!==200)throw new Error('Limite apenas revogar nao foi aplicado');
+  await permissionPanel();
+  if (!(await evaluate("document.querySelector('[data-code=PRODUTO_CONSULTAR] button').disabled"))) throw new Error('Revogador pode aplicar HERDAR indevidamente.');
+  await evaluate("var permissionSelect=document.querySelector('[data-code=PRODUTO_CONSULTAR] select');permissionSelect.value='NEGAR';permissionSelect.dispatchEvent(new Event('change'));true");
+  if (!(await evaluate("!document.querySelector('[data-code=PRODUTO_CONSULTAR] button').disabled"))) throw new Error('Negacao autorizada permaneceu desabilitada.');
+  pass('permissoes: gerente com revogar sem conceder so aplica a transicao autorizada');
   // Conflito real: proprietario muda a versao enquanto gerente mantem editor aberto.
   const employee=await ownerApi(`/funcionarios/${targetLink}`);await ownerApi(`/funcionarios/${targetLink}/individuais/PRODUTO_CONSULTAR`,'PUT',{estado:'NEGAR',versao:employee.body.versao});
-  await evaluate("var card=document.querySelector('[data-code=PRODUTO_CONSULTAR]');card.querySelector('select').value='PERMITIR';card.querySelector('button').click();true");
+  await evaluate("var card=document.querySelector('[data-code=PRODUTO_CONSULTAR]');card.querySelector('select').value='NEGAR';card.querySelector('select').dispatchEvent(new Event('change'));card.querySelector('button').click();true");
   await wait("document.querySelector('[data-message]')?.classList.contains('error')",'conflito de versao visivel');pass('permissoes: conflito real entre sessoes tratado');
   const limitsNow=await ownerApi(`/funcionarios/${fixture.managerVinculo}`);await ownerApi(`/funcionarios/${fixture.managerVinculo}/limites`,'PUT',{adicionais:false,alvos:[],permissoes:[],versao:limitsNow.body.versao});
   await evaluate("var card=document.querySelector('[data-code=PRODUTO_CONSULTAR]');card.querySelector('button').click();true");

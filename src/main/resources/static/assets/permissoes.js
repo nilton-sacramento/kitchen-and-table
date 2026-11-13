@@ -39,7 +39,13 @@ export function createPermissionsEditor({ call, editor, finishForm, run, fail, g
             select.append(option);
           }
           select.value = item.estado; select.disabled = !grant && !revoke;
-          const save = node('button', 'Aplicar exceção', 'secondary'); save.type = 'button'; save.disabled = select.disabled; save.dataset.permissionDisabled = String(select.disabled); save.setAttribute('aria-label', `Aplicar exceção: ${p.nome}`);
+          const save = node('button', 'Aplicar exceção', 'secondary'); save.type = 'button'; save.setAttribute('aria-label', `Aplicar exceção: ${p.nome}`);
+          const updateAction = () => {
+            const blocked = select.disabled || !select.selectedOptions.length || select.selectedOptions[0].disabled;
+            save.disabled = blocked; save.dataset.permissionDisabled = String(blocked);
+          };
+          select.addEventListener('change', updateAction); updateAction();
+          if (grant !== revoke) card.append(node('p', `Você pode apenas ${grant ? 'permitir' : 'negar'} esta capacidade. Voltar a Herdar exige autorização para conceder e revogar.`, 'muted small'));
           save.addEventListener('click', () => {
             if (confirm(`Confirmar ${select.value} para ${p.nome}, somente nesta unidade?`)) run(() => call(`/funcionarios/${row.vinculoId}/individuais/${encodeURIComponent(p.codigo)}`, 'PUT', { estado: select.value, versao: panel.versao }), 'Permissão atualizada. Abra novamente para consultar o resultado.');
           });
