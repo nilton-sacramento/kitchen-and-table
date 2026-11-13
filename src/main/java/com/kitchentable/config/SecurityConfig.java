@@ -71,7 +71,7 @@ public class SecurityConfig {
                 .deleteCookies("JSESSIONID")
                 .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/app.css", "/assets/app.js", "/assets/funcionarios.js").permitAll()
+                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/app.css", "/assets/app.js", "/assets/funcionarios.js", "/assets/permissoes.js").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/setup/proprietario").permitAll()

@@ -258,3 +258,17 @@ html{scroll-behavior:smooth}
   .employee-table .employee-actions button{flex:1 1 115px}
   .employee-identifiers summary{min-height:44px;padding:12px 0}
 }
+.permission-form{max-width:none}
+.permission-form fieldset{border:1px solid var(--line);border-radius:8px;padding:18px;display:grid;gap:12px;min-width:0}
+.permission-form legend{font-size:14px;padding:0 6px;font-weight:600}
+.permission-groups{display:grid;gap:24px}
+.permission-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.permission-group h4{grid-column:1/-1;font-size:12px;letter-spacing:1px}
+.permission-card{border:1px solid var(--line);padding:16px;border-radius:8px;display:grid;gap:9px;min-width:0;background:#fff;overflow-wrap:anywhere}
+.permission-card[hidden]{display:none}
+.permission-card p,.permission-card label{font-size:12px;line-height:1.6;margin:0}
+.permission-card small{display:block;font-size:11px}
+.permission-card summary{cursor:pointer;font-size:12px;min-height:32px}
+.permission-card code{font-size:11px;white-space:normal;overflow-wrap:anywhere}
+.permission-result{background:#f1f4ed;padding:10px;border-radius:5px}
+@media(max-width:600px){.permission-group{grid-template-columns:1fr}.permission-form fieldset{padding:12px}.permission-card button,.permission-card summary{min-height:44px}.permission-card{padding:12px}}
