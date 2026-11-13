@@ -51,7 +51,7 @@ Prazo padrão operacional: **300 segundos**. Configuração administrativa: **30
 
 GET de contexto/polling não renova atividade. Interações reais de teclado/toque/ponteiro geram atividade protegida por CSRF e somente uma sessão ainda válida recebe novo prazo. Aumentar a configuração não ressuscita uma sessão vencida. O navegador usa o tempo restante calculado no servidor e relógio monotônico; o backend decide o acesso mesmo com JavaScript manipulado.
 
-A interface remove nomes e informações protegidas ao bloquear, perder validação ou ocultar a aba. Não basta uma sobreposição CSS. Desbloqueio exige novamente identificação e PIN. F5 restaura somente um contexto que o servidor ainda considere válido. Troca de operador encerra o contexto anterior e registra as identidades corretas.
+A interface remove nomes e informações protegidas ao bloquear, perder validação ou ocultar a aba. Não basta uma sobreposição CSS. Desbloqueio exige novamente identificação e PIN. F5 restaura somente um contexto que o servidor ainda considere válido e que não tenha uma marca local de bloqueio. A marca é somente booleana; não contém credenciais ou informações do funcionário. Troca de operador encerra o contexto anterior e registra as identidades corretas.
 
 `createOperationalDrafts` oferece um cofre **somente em memória**, isolado por unidade/vínculo: bloqueio recusa leitura/escrita; novo desbloqueio do mesmo operador preserva os valores; troca/logout os apagam. Não existem formulários de pedidos para integrar nesta entrega. Não se promete persistência de rascunho após F5/fechamento; nenhum rascunho foi colocado em Web Storage. Esse mecanismo não protege memória contra código malicioso já executando na própria origem.
 
@@ -166,3 +166,60 @@ Durante a validação foram tratados: expectativas antigas de contagem de migra�
 | Criado | `src/main/resources/static/assets/seguranca-operacional.js` |
 | Criado | `src/main/resources/static/operacional.html` |
 | Criado | `src/test/java/com/kitchentable/funcionarios/OperacionalPostgresTest.java` |
+
+## Revisão final independente do relatório de implementação — 13/11/2026
+
+HEAD inicial conferido localmente e no PR #5: `d1015c44791336308a2c3a554bd1519548b5a3c1`. Branch limpa ao iniciar; PR Draft, destino develop e dois checks aprovados nesse HEAD. Revisão do código real de serviços, controllers, Spring Security, DTOs, SQL, avaliador de permissões e JavaScript; as alegações abaixo não se baseiam apenas na documentação anterior.
+
+### Segurança verificada
+
+| Área | Evidência no código/testes | Conclusão e limite |
+| --- | --- | --- |
+| PIN | OperacionalService usa BCryptPasswordEncoder(12); somente o hash entra em credenciais_operacionais. DTOs Entrada/Definicao omitem credencial em toString; handler de parsing retorna erro genérico. | Não identificado PIN em texto puro persistido, respostas ou auditoria. Não há logging de corpo/PIN no código da aplicação; logs de proxy/infraestrutura ainda precisam de revisão antes do piloto. |
+| Três tentativas | entrar serializa a credencial com FOR UPDATE, confirma contador/auditoria antes do 401 e grava bloqueio/versão no PostgreSQL. | F5, nova sessão HTTP ou outro navegador não zeram o estado compartilhado no banco. Testes incluem sessões novas e três erros concorrentes. |
+| Enumeração e automação | Resposta 401 uniforme e trabalho BCrypt fictício para identificação inválida/bloqueada. | Mitigação de enumeração por mensagem, sem garantia de tempo perfeitamente uniforme. Não há limitador distribuído por origem/dispositivo; não está pronto para exposição pública. |
+| Administração | admin/alvo exigem autoridade principal, capacidade efetiva, vínculo/unidade ativos e limites de funções. Redefinir bloqueado exige também desbloqueio. | Gerente não altera proprietário, outro gerente ou si próprio por esse fluxo; nenhuma capacidade nova é atribuída automaticamente. |
+| Sessão | OperacionalController rotaciona JSESSIONID/CSRF e salva ROLE_OPERADOR; SecurityConfig exige ROLE_USER nas APIs administrativas. | PIN de gerente não equivale ao login administrativo. Logout encerra sessão operacional e invalida HTTP, inclusive sob falha de auditoria. |
+| Revogação e isolamento | contexto valida usuário real do vínculo, unidade, ativo, bloqueio, versão, prazo e acesso pelo avaliador central da 2.2. FK composta vínculo/unidade e mutações serializadas por unidade. | Sessões antigas continuam inválidas após desbloqueio/reativação. Uma mutação já serializada antes da revogação pode concluir antes dela; operações posteriores são negadas. |
+| Inatividade | Prazo por unidade no backend; GET não renova; atividade válida usa POST com CSRF. | A UI não é a autoridade. Contexto/atividade são recusados após bloqueio. Nenhuma operação financeira ou de pedidos está habilitada. |
+| Banco | V9/V10 criam estruturas/catálogo sem preencher PINs nem conceder permissões; V1–V8 permanecem intactas. | Revisão não criou/alterou migrações. Instalação e upgrades são exercitados somente em PostgreSQL 16 descartável. |
+
+### Problemas encontrados e corrigidos antes do merge
+
+1. **Bloqueio com perda de conexão:** reprodução Chrome no HEAD inicial: entrar, desligar rede do navegador, clicar Bloquear agora, reconectar e pressionar F5. A sessão ainda válida era reexibida porque o servidor não recebera o bloqueio. A regressão falhou com `F5 contornou bloqueio que falhou por falta de rede`. Agora uma marca **booleana** `kt.operational.locked=1` em sessionStorage mantém a exigência de PIN por aba; ao reconectar, a interface confirma o bloqueio antes de permitir novo acesso. Não contém PIN, hash, identidade, permissões ou rascunho. Armazenamento indisponível inicia com exigência de PIN. A marca não é prova de autenticação nem substitui validação do backend; não pode conceder acesso.
+2. **Login e Sair concorrentes:** o cliente iniciava logout sem aguardar uma entrada em andamento. Agora oculta dados imediatamente, impede novas submissões e aguarda a entrada antes de invalidar a sessão resultante. O smoke usa barreiras de rede controladas para verificar a ordem e confirma 401/F5 após a saída; não substitui respostas reais de autenticação.
+3. **Troca silenciosa por cookie compartilhado:** polling podia substituir o operador exibido quando outra aba autenticava uma pessoa diferente. Agora a aba anterior oculta o contexto e exige identificação/PIN. O smoke realiza a segunda autenticação real e confirma essa proteção. Isso não transforma abas do mesmo perfil em sessões independentes.
+4. **Foco e identidade na interface:** polling de conteúdo sem alteração recriava botões e removia foco do teclado. Agora preserva os elementos; Trocar operador limpa a identificação anterior, evitando atribuir erros ao funcionário errado. Tentativas anônimas aparecem como executor Não identificado, coerente com o executor nulo no banco.
+5. **Respostas lentas:** o cliente desconta o tempo da requisição do prazo restante e não exibe contexto que já chegou vencido. A proteção do servidor já existia; este ajuste torna a ocultação local conservadora.
+
+F5 normal com sessão ainda válida e sem bloqueio continua preservado. Os eventos de navegação/pagehide foram separados da ocultação efetiva da aba, sem relaxar bloqueios manuais, de inatividade ou por perda de validação. Retorno pelo histórico exige revalidação e respeita a marca de bloqueio.
+
+### Validação adicional
+
+O smoke anterior continua obrigatório. Foram acrescentados: rede realmente desativada pelo Chrome e retorno/F5 com exigência de PIN/423; marca apenas booleana e fallback com armazenamento indisponível; preservação do foco durante polling; limpeza de identificação na troca; segunda autenticação real simulando outra aba; e barreiras determinísticas entre entrada e logout com verificação final 401. Nenhum teste anterior foi removido ou desativado. Desktop 1366px, tablet 768px e celular 360px permanecem no smoke.
+
+As correções desta revisão afetam apenas `assets/operacional.js`, `assets/seguranca-operacional.js`, `scripts/smoke-operacional.mjs`, diagnóstico seguro em `scripts/smoke-funcionarios.mjs` e este relatório. Nenhuma mudança de regra de negócio, backend, esquema ou credencial administrativa foi necessária.
+
+### Pendências obrigatórias antes de um piloto
+
+| Pendência | Medida necessária | Bloqueia este merge? |
+| --- | --- | --- |
+| HTTPS e cookie | Terminação TLS confiável, KT_COOKIE_SECURE=true, validação de HttpOnly/SameSite/CSRF na URL real. Sem HTTP público. | Não; bloqueia o piloto fora do loopback. |
+| Tentativas em massa/DoS | Limites por origem/dispositivo e capacidade global, limites de requisição, proxy confiável e teste de carga/negação. Não confiar em X-Forwarded-For arbitrário. Três erros por pessoa não impedem ataque contra muitos IDs e podem ser usados para bloquear um funcionário conhecido. | Não; bloqueia exposição ao público. |
+| Dispositivos compartilhados | Perfil dedicado, uma aba operacional ativa por perfil, bloqueio do SO, saída da conta administrativa antes de entregar o terminal e teste do procedimento com a equipe. Não compartilhar credenciais. | Não; bloqueia uso sem procedimento validado. |
+| Conexão perdida | UI falha fechada, mas um servidor não recebe uma revogação enquanto a rede está interrompida. A garantia de revogação no servidor começa com confirmação ou expiração; a marca local não protege contra manipulação deliberada do navegador por alguém com cookie válido. Não reutilizar terminal após falha de saída até confirmar saída/reautenticação. Não há modo offline. | Correção de F5 feita; procedimento obrigatório no piloto. |
+| Dados existentes/recuperação | Autorização separada para backup, restauração ensaiada e migração do banco que for usado no piloto. Definir retenção/monitoramento de sessões e auditoria, restrição e proteção dos backups. | Não; nenhuma migração operacional foi executada nesta revisão. |
+| Escopo do piloto | Validar entrada com IDs de unidade/vínculo fornecidos pelo responsável, tempo de inatividade e fluxo real de bloqueio/desbloqueio com usuários sem conhecimento técnico. UUIDs completos são funcionais, mas pouco ergonômicos. | Não; aceite prático necessário antes de uso. |
+
+Notificações externas continuam ausentes, conforme escopo aprovado: o evento persistido prepara integração, não envia alerta. Para o piloto, definir quem consulta e responde a eventos/bloqueios; se alerta externo imediato for requisito operacional do piloto, isso será pendência antes dele. Não é necessário iniciar a Entrega 2.4 para revisar esta feature.
+
+Rascunhos continuam somente em memória; F5, fechamento, falha do navegador ou reinício podem perdê-los. Não há pedidos reais não enviados nesta entrega. Não aprovar piloto de pedidos/caixa com base nesse cofre nem prometer recuperação durável. Sessões HTTP em memória exigem nova autenticação ao reiniciar e ainda não suportam múltiplas instâncias sem desenho adicional.
+
+**Recomendação de escopo:** integrar somente a fundação de PIN/segurança após CI do novo HEAD. Prontidão para merge não significa autorização de piloto, migração operacional, deploy ou uso dos módulos futuros.
+### Resultado desta revisão
+
+- Suíte completa repetida após as correções: **137 testes, zero falhas, erros ou ignorados**, BUILD SUCCESS; PostgreSQL 16 exclusivamente descartável.
+- Smoke Chrome completo: **SMOKE_BROWSER_SUCCESS**, incluindo as regressões novas e desktop/tablet/360px. O teste offline falhou no código inicial e passou depois da correção; nenhum teste foi enfraquecido.
+- Migrações V1–V10, backend e credenciais administrativas não receberam alterações nesta revisão. Nenhum acesso ao PostgreSQL operacional.
+- Recomendação após aprovação do CI do HEAD corrigido: **PRONTO PARA MERGE em develop**, mantendo o PR Draft até autorização. **Piloto ainda condicionado às pendências acima**, sem deploy ou início da Entrega 2.4.
+- O HEAD corrigido e os links dos checks são registrados no PR #5; a aprovação do HEAD inicial não deve ser usada como evidência para um HEAD posterior.
