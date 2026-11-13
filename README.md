@@ -39,7 +39,7 @@ mvn spring-boot:run
 
 Abra http://localhost:8080. A aplicação fica vinculada a 127.0.0.1 por padrão. Não há publicação da aplicação na internet neste procedimento.
 
-**Banco já existente:** não executar esta feature contra o PostgreSQL operacional. Flyway aplicaria V5–V7 no startup. Migração real exige aprovação específica, backup e restauração ensaiada. Para validar a entrega, utilize os testes descartáveis descritos em docs/entrega-2-2.md. Não execute setup novamente para contas já cadastradas.
+**Banco já existente:** não executar esta feature contra o PostgreSQL operacional. Flyway aplicaria V5–V8 no startup. Migração real exige aprovação específica, backup e restauração ensaiada. Para validar a entrega, utilize os testes descartáveis descritos em docs/entrega-2-2.md. Não execute setup novamente para contas já cadastradas.
 
 **Instalação realmente nova:** depois de configurar DB_PASSWORD, `docker compose up -d db` cria o banco local. O setup único é descrito em [docs/configuracao-inicial.md](docs/configuracao-inicial.md). Não o execute para o proprietário já cadastrado.
 
