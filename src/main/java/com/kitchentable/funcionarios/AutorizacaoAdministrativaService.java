@@ -10,7 +10,10 @@ import static com.kitchentable.funcionarios.FuncionarioRepository.erro;
 public class AutorizacaoAdministrativaService {
     static final List<String> COMUNS=List.of("ATENDENTE","CAIXA","COZINHA","BAR");
     private final FuncionarioRepository repo;
-    public AutorizacaoAdministrativaService(FuncionarioRepository repo) { this.repo=repo; }
+    private final PermissoesService permissoes;
+    public AutorizacaoAdministrativaService(FuncionarioRepository repo,PermissoesService permissoes) { this.repo=repo;this.permissoes=permissoes; }
+    private String codigo(String acao){return "FUNCIONARIO_"+switch(acao){case "consultar"->"CONSULTAR";case "cadastrar"->"CADASTRAR";case "editar"->"EDITAR";case "ativar"->"ATIVAR";case "desativar"->"DESATIVAR";case "associar"->"ASSOCIAR";default->"DESCONHECIDO";};}
+    void exigirMudancaFuncao(Administrador ator){permissoes.exigirExistente(ator.pessoa().vinculo(),"FUNCIONARIO_FUNCAO_PRINCIPAL_ALTERAR");}
     record Administrador(FuncionarioRepository.Pessoa pessoa, Delegacao delegacao, boolean proprietario) {}
     Administrador carregar(UUID unidade,String email) {
         var pessoa=repo.ator(unidade,email);
@@ -27,6 +30,7 @@ public class AutorizacaoAdministrativaService {
             case "desativar" -> d.desativar(); case "associar" -> d.associar(); default -> false;
         };
         if(!allowed) throw erro(HttpStatus.FORBIDDEN,"Operação não autorizada");
+        permissoes.exigirExistente(ator.pessoa().vinculo(),codigo(acao));
     }
     void funcaoPermitida(Administrador ator,String funcao) {
         if(!COMUNS.contains(funcao) && !funcao.equals("GERENTE")) throw erro(HttpStatus.BAD_REQUEST,"Função inválida para gestão de funcionários");
@@ -43,6 +47,6 @@ public class AutorizacaoAdministrativaService {
     Capacidades capacidades(Administrador ator) {
         if(ator.proprietario()) return new Capacidades(true,true,true,true,true,true,true,List.of("ATENDENTE","CAIXA","COZINHA","BAR","GERENTE"));
         var d=ator.delegacao();
-        return new Capacidades(false,d.consultar(),d.cadastrar(),d.editar(),d.ativar(),d.desativar(),d.associar(),d.funcoes());
+        return new Capacidades(false,d.consultar()&&permissoes.podeExistente(ator.pessoa().vinculo(),codigo("consultar")),d.cadastrar()&&permissoes.podeExistente(ator.pessoa().vinculo(),codigo("cadastrar")),d.editar()&&permissoes.podeExistente(ator.pessoa().vinculo(),codigo("editar")),d.ativar()&&permissoes.podeExistente(ator.pessoa().vinculo(),codigo("ativar")),d.desativar()&&permissoes.podeExistente(ator.pessoa().vinculo(),codigo("desativar")),d.associar()&&permissoes.podeExistente(ator.pessoa().vinculo(),codigo("associar")),d.funcoes());
     }
 }

@@ -32,8 +32,12 @@ public final class FuncionariosBrowserFixture {
                 jdbc.update("INSERT INTO usuarios_estabelecimentos(usuario_id,estabelecimento_id,funcao_id) SELECT ?,?,id FROM funcoes WHERE codigo='PROPRIETARIO'",owner,unit);
                 jdbc.update("INSERT INTO estabelecimentos(id,nome) VALUES(?,'Unidade de teste B')",second);
                 jdbc.update("INSERT INTO usuarios_estabelecimentos(usuario_id,estabelecimento_id,funcao_id) SELECT ?,?,id FROM funcoes WHERE codigo='PROPRIETARIO'",owner,second);
+                UUID manager=UUID.randomUUID(),managerLink=UUID.randomUUID();
+                jdbc.update("INSERT INTO usuarios(id,nome,email,senha_hash) VALUES(?,'ZZZ Gerente de teste',?,?)",manager,fixture.get("managerEmail").asText(),encoder.encode(fixture.get("managerPassword").asText()));
+                jdbc.update("INSERT INTO usuarios_estabelecimentos(id,usuario_id,estabelecimento_id,funcao_id) SELECT ?,?,?,id FROM funcoes WHERE codigo='GERENTE'",managerLink,manager,unit);
+                jdbc.update("INSERT INTO delegacoes_administrativas(vinculo_id,consultar,funcoes) VALUES(?,true,ARRAY['ATENDENTE'])",managerLink);
                 int port=((ServletWebServerApplicationContext)context).getWebServer().getPort();
-                System.out.println("KT_BROWSER_READY "+json.writeValueAsString(Map.of("url","http://127.0.0.1:"+port,"estabelecimentoId",unit,"destinoId",second)));
+                System.out.println("KT_BROWSER_READY "+json.writeValueAsString(Map.of("url","http://127.0.0.1:"+port,"estabelecimentoId",unit,"destinoId",second,"managerVinculo",managerLink)));
                 input.readLine(); // Somente o controlador de teste sinaliza encerramento.
             }
         }

@@ -33,7 +33,7 @@ public class FuncionarioRepository {
     Pessoa ator(UUID estabelecimento, String email) {
         var rows=jdbc.query("SELECT u.id,ue.id AS vinculo,f.codigo FROM usuarios u " +
             "JOIN usuarios_estabelecimentos ue ON ue.usuario_id=u.id JOIN funcoes f ON f.id=ue.funcao_id " +
-            "WHERE lower(u.email)=lower(?) AND u.ativo=true AND ue.ativo=true AND ue.estabelecimento_id=?",
+            "WHERE lower(u.email)=lower(?) AND u.ativo=true AND ue.ativo=true AND ue.estabelecimento_id=? AND (f.codigo='PROPRIETARIO' OR NOT EXISTS(SELECT 1 FROM usuarios_permissoes up JOIN permissoes p ON p.id=up.permissao_id WHERE up.vinculo_id=ue.id AND p.codigo='ESTABELECIMENTO_VISUALIZAR' AND NOT up.permitido))",
             (rs,i)->new Pessoa(rs.getObject("id",UUID.class),rs.getObject("vinculo",UUID.class),rs.getString("codigo")),email,estabelecimento);
         if(rows.isEmpty()) throw erro(HttpStatus.FORBIDDEN,"Acesso administrativo não autorizado");
         return rows.get(0);
@@ -92,6 +92,9 @@ public class FuncionarioRepository {
         jdbc.update("UPDATE usuarios_estabelecimentos SET ativo=?,versao=versao+1,atualizado_em=now() WHERE id=? AND estabelecimento_id=?",ativo,vinculo,unidade);
     }
     void funcao(UUID unidade,UUID vinculo,String codigo) {
+        jdbc.update("DELETE FROM vinculos_funcoes_adicionais WHERE vinculo_id=? AND funcao_id=(SELECT id FROM funcoes WHERE codigo=?)",vinculo,codigo);
+        jdbc.update("DELETE FROM limites_gestao_alvos WHERE alvo_id=?",vinculo);
+        jdbc.update("DELETE FROM limites_gestao_permissoes WHERE gerente_id=?",vinculo);
         jdbc.update("UPDATE usuarios_estabelecimentos SET funcao_id=(SELECT id FROM funcoes WHERE codigo=?),versao=versao+1,atualizado_em=now() WHERE id=? AND estabelecimento_id=?",codigo,vinculo,unidade);
         // Uma delegacao antiga nunca ressurge ao rebaixar e promover novamente.
         jdbc.update("DELETE FROM delegacoes_administrativas WHERE vinculo_id=?",vinculo);

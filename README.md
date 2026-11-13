@@ -2,7 +2,7 @@
 
 SaaS de gestão para restaurantes, bares e lanchonetes, em desenvolvimento por etapas.
 
-A Etapa 1 implementa a interface inicial e a autenticação por sessão. Esta feature acrescenta a Entrega 2.1: gestão administrativa de funcionários e vínculos, em revisão. Não é uma versão pronta para produção.
+Etapa 1 e Entrega 2.1 estão integradas à develop. Esta feature acrescenta a Entrega 2.2: funções adicionais, permissões e delegações controladas, para revisão. Não é uma versão pronta para produção.
 
 **Antes de executar esta feature com dados existentes, leia [o plano de migrações e testes](docs/entrega-2-1.md). Não iniciar contra o PostgreSQL operacional sem aprovação específica de backup/migração.**
 
@@ -25,7 +25,7 @@ Angular, JWT, JPA, WebSockets e operação offline não fazem parte desta implem
 - Cookie HttpOnly/SameSite=Lax, CSRF no login/logout e HTTP Basic desabilitado.
 - Navegação para módulos futuros, sinalizados como em desenvolvimento.
 
-Cadastro/gestão de funcionários, vínculos, delegações administrativas mínimas e associação controlada estão implementados nesta feature. PIN, permissões granulares completas, funções adicionais, temporários, produtos, mesas, comandas, pedidos, cozinha, bar, estoque, caixa e relatórios continuam pendentes. A função exibida no painel não equivale a autorização granular implementada.
+Cadastro/gestão de funcionários, vínculos, associação controlada, funções adicionais e permissões administrativas estão implementados. O catálogo operacional/financeiro representa contratos futuros, sem operações habilitadas. PIN, temporários, produtos, mesas, comandas, pedidos, cozinha, bar, estoque, caixa e relatórios continuam pendentes.
 
 ## Executar localmente no Windows
 
@@ -39,7 +39,7 @@ mvn spring-boot:run
 
 Abra http://localhost:8080. A aplicação fica vinculada a 127.0.0.1 por padrão. Não há publicação da aplicação na internet neste procedimento.
 
-**Banco já existente:** mantenha o contêiner original em execução e use a mesma senha e endereço. Não execute setup novamente. Não suba outro banco do clone: Compose pode criar outro volume por causa do nome diferente da pasta. `DB_URL` e `DB_USER` podem ser informados no mesmo terminal quando necessário. Nenhum comando aqui muda a senha do banco existente.
+**Banco já existente:** não executar esta feature contra o PostgreSQL operacional. Flyway aplicaria V5–V8 no startup. Migração real exige aprovação específica, backup e restauração ensaiada. Para validar a entrega, utilize os testes descartáveis descritos em docs/entrega-2-2.md. Não execute setup novamente para contas já cadastradas.
 
 **Instalação realmente nova:** depois de configurar DB_PASSWORD, `docker compose up -d db` cria o banco local. O setup único é descrito em [docs/configuracao-inicial.md](docs/configuracao-inicial.md). Não o execute para o proprietário já cadastrado.
 
@@ -51,7 +51,7 @@ Não há senha padrão do banco no código. Um arquivo .env do Compose não é c
 mvn test
 ```
 
-Os testes conectam somente a PostgreSQL 16 descartável para a Entrega 2.1; os testes anteriores usam mocks/Tomcat isolado. Docker é necessário, sem acesso ao banco operacional. A expiração usa Tomcat real em porta aleatória de loopback e timeout de dois segundos somente no contexto de teste; o prazo normal permanece 30 minutos.
+Os testes conectam somente a PostgreSQL 16 descartável para as Entregas 2.1 e 2.2; os testes anteriores usam mocks/Tomcat isolado. Docker é necessário, sem acesso ao banco operacional. A expiração usa Tomcat real em porta aleatória de loopback e timeout de dois segundos somente no contexto de teste; o prazo normal permanece 30 minutos.
 
 Para executar somente a expiração:
 
@@ -65,13 +65,18 @@ O frontend não exige Node para executar. Com Node instalado, `node --check src/
 
 Sessões estão na memória do servidor e se encerram ao reiniciar. Antes de produção será necessário revisar HTTPS, cookie Secure (`KT_COOKIE_SECURE=true` em HTTPS), infraestrutura, atualizações de dependências, permissões por estabelecimento, revogação de sessões e proteção contra tentativas repetidas. O HTTP local usa cookie sem Secure por necessidade de desenvolvimento.
 
-Senhas nos testes são fictícias e usadas exclusivamente com dependências simuladas. Não representam contas operacionais. A exceção de CSRF do setup permanece limitada ao endpoint protegido pela chave externa e pelo bloqueio de inicialização única; a interface não utiliza esse endpoint.
+Credenciais nos testes são sintéticas e usadas exclusivamente com dependências simuladas ou PostgreSQL descartável. Não representam contas operacionais. A exceção de CSRF do setup permanece limitada ao endpoint protegido pela chave externa e pelo bloqueio de inicialização única; a interface não utiliza esse endpoint.
 
 ## Documentação e versionamento
 
+- [Entrega 2.2: funções e permissões](docs/entrega-2-2.md)
 - [Entrega 2.1: funcionalidades, segurança e migrações](docs/entrega-2-1.md)
 - [Autenticação por sessão](docs/autenticacao-sessao.md)
 - [Situação da Etapa 1 e evidências](docs/etapa-1.md)
 - [Fluxo de branches e propostas de PR](docs/fluxo-publicacao.md)
 
-Fluxo: `feature/etapa-1-autenticacao` → `develop` → `main`. Publicação exige autorização; merges não são automáticos. A publicação do código no GitHub não é implantação do SaaS.
+Fluxo desta entrega: `feature/entrega-2-2-funcoes-permissoes` → `develop`; promoção à `main` exige autorização separada. Publicação exige autorização; merges não são automáticos. A publicação do código no GitHub não é implantação do SaaS.
+
+## Entrega 2.2 em revisão
+
+Funções adicionais, catálogo, exceções individuais, limites de gerente e interface real estão nesta feature. Consulte [docs/entrega-2-2.md](docs/entrega-2-2.md). Não iniciar a aplicação contra o PostgreSQL operacional antes de autorização específica de migração. PIN e operações dos módulos futuros continuam pendentes.

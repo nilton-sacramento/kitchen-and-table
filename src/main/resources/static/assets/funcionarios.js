@@ -1,9 +1,10 @@
+import { createPermissionsEditor } from './permissoes.js';
 const roles = { ATENDENTE: 'Atendente', CAIXA: 'Caixa', COZINHA: 'Cozinha', BAR: 'Bar', GERENTE: 'Gerente' };
 const common = ['ATENDENTE', 'CAIXA', 'COZINHA', 'BAR'];
 const uuidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const el = (tag, text = '', className = '') => { const node = document.createElement(tag); node.textContent = text; node.className = className; return node; };
 export function createEmployeeScreen({ root, api, onExpired, getEstablishments = () => [] }) {
-  let unit = null, generation = 0, capabilities = null, rows = [], requests = [], busy = false;
+  let unit = null, generation = 0, capabilities = null, rows = [], requests = [], busy = false, permissionCapabilities = { proprietario: false, alvos: [] };
   function reset() { generation++; unit = null; rows = []; requests = []; capabilities = null; busy = false; editorTrigger = null; root.removeAttribute('aria-busy'); root.replaceChildren(); }
   function path(suffix = '') { return `estabelecimentos/${encodeURIComponent(unit)}/funcionarios${suffix}`; }
   async function request(suffix, method = 'GET', data, key) {
@@ -12,6 +13,13 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     const csrf = await api('auth/csrf');
     return api(destination, { method, headers: { [csrf.headerName]: csrf.token, 'Content-Type': 'application/json', ...(key ? { 'Idempotency-Key': key } : {}) }, body: JSON.stringify(data) });
   }
+  async function permissionCall(suffix, method = 'GET', data) {
+    const destination = `estabelecimentos/${encodeURIComponent(unit)}/permissoes${suffix}`;
+    if (method === 'GET') return api(destination);
+    const csrf = await api('auth/csrf');
+    return api(destination, { method, headers: { [csrf.headerName]: csrf.token, 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  }
+  const permissionsEditor = createPermissionsEditor({ call: permissionCall, editor, finishForm, run, fail, generation: () => generation, rows: () => rows, refresh: () => load(generation) });
   let editorTrigger = null;
   function restoreFocus(key) {
     const candidate = key && root.querySelector(`[data-focus="${CSS.escape(key)}"]`);
@@ -35,8 +43,13 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
       if (current !== generation) return;
       await load(current);
       if (current === generation) message(success);
-    } catch (error) { if (current === generation) fail(error); }
-    finally { if (current === generation) { busy = false; root.removeAttribute('aria-busy'); root.querySelectorAll('button').forEach((b) => { b.disabled = false; }); restoreFocus(focusKey); editorTrigger = null; } }
+    } catch (error) {
+      if (current === generation) {
+        if (error.status === 403) { root.querySelector('[data-editor]')?.replaceChildren(); await load(current).catch(() => {}); }
+        fail(error);
+      }
+    }
+    finally { if (current === generation) { busy = false; root.removeAttribute('aria-busy'); root.querySelectorAll('button').forEach((b) => { b.disabled = b.dataset.permissionDisabled === 'true'; }); restoreFocus(focusKey); editorTrigger = null; } }
   }
   function button(label, action, className = 'secondary') {
     const b = el('button', label, className); b.type = 'button'; b.dataset.focus = label; b.addEventListener('click', action); return b;
@@ -99,7 +112,12 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
         ...Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, field.checked])),
         funcoes: allowed.filter(([, field]) => field.checked).map(([code]) => code), versao: data.versao,
       }), 'Limites do gerente atualizados.'));
-    } catch (error) { if (current === generation) fail(error); }
+    } catch (error) {
+      if (current === generation) {
+        if (error.status === 403) { root.querySelector('[data-editor]')?.replaceChildren(); await load(current).catch(() => {}); }
+        fail(error);
+      }
+    }
   }
   function associate(row) {
     const form = editor(`Autorizar associação: ${row.nome}`);
@@ -127,7 +145,7 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     root.append(el('p', 'Cadastros e vínculos reais desta unidade. O PIN e o acesso operacional serão disponibilizados na Entrega 2.3. Credenciais administrativas existentes são preservadas.', 'muted small'));
     const msg = el('p'); msg.dataset.message = ''; msg.setAttribute('role', 'status'); msg.hidden = true; root.append(msg);
     const slot = el('section', '', 'employee-editor'); slot.dataset.editor = ''; slot.hidden = true; root.append(slot);
-    if (!capabilities.consultar) root.append(el('p', 'Seu acesso não permite listar a equipe. As demais ações também são validadas no servidor.', 'muted'));
+    if (!capabilities.consultar && !permissionCapabilities.proprietario && !permissionCapabilities.alvos.length) root.append(el('p', 'Seu acesso não permite listar a equipe. As demais ações também são validadas no servidor.', 'muted'));
     else {
       const search = el('input'); search.type = 'search'; search.placeholder = 'Buscar por nome ou contato'; search.setAttribute('aria-label', 'Buscar funcionários'); root.append(search);
       const wrap = el('div', '', 'employee-table-wrap'); const table = el('table', '', 'employee-table'); table.setAttribute('role', 'table'); table.setAttribute('aria-label', 'Funcionários desta unidade'); const thead = el('thead'); const tr = el('tr');
@@ -144,12 +162,18 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
           name.append(el('strong', row.nome), details);
           const contact = el('td'); contact.append(el('div', row.emailContato || 'Sem e-mail de contato'), el('small', row.telefone || '', 'muted'));
           const buttons = el('td'); const controls = el('div', '', 'employee-actions');
-          if (capabilities.editar) { controls.append(button('Editar', () => edit(row))); controls.append(button('Função', () => changeRole(row))); }
-          if ((row.ativo && capabilities.desativar) || (!row.ativo && capabilities.ativar)) controls.append(button(row.ativo ? 'Desativar' : 'Ativar', () => {
+          const manageRow = capabilities.proprietario || capabilities.funcoes.includes(row.funcao);
+          if (capabilities.editar && manageRow) {
+            controls.append(button('Editar', () => edit(row)));
+            if (permissionCapabilities.alterarPrincipal) controls.append(button('Função', () => changeRole(row)));
+          }
+          if (manageRow && ((row.ativo && capabilities.desativar) || (!row.ativo && capabilities.ativar))) controls.append(button(row.ativo ? 'Desativar' : 'Ativar', () => {
             if (window.confirm(`${row.ativo ? 'Desativar' : 'Ativar'} o vínculo de ${row.nome} nesta unidade? O histórico e as outras unidades serão preservados.`)) run(() => request(`/${row.vinculoId}/situacao`, 'PATCH', { ativo: !row.ativo, versao: row.versao }), 'Situação do vínculo atualizada.');
           }));
           if (capabilities.proprietario && row.funcao === 'GERENTE') controls.append(button('Limites do gerente', () => delegation(row)));
-          if (capabilities.associar && row.ativo) controls.append(button('Associar a outra unidade', () => associate(row)));
+          if (permissionCapabilities.proprietario || (common.includes(row.funcao) && permissionCapabilities.alvos.includes(row.vinculoId))) controls.append(button('Funções e permissões', () => permissionsEditor.open(row)));
+          if (permissionCapabilities.proprietario && row.funcao === 'GERENTE') controls.append(button('Delegar gestão de permissões', () => permissionsEditor.limits(row)));
+          if (capabilities.associar && row.ativo && manageRow) controls.append(button('Associar a outra unidade', () => associate(row)));
           controls.querySelectorAll('button').forEach((b) => { b.setAttribute('aria-label', `${b.textContent}: ${row.nome}`); b.dataset.focus = `${row.vinculoId}:${b.textContent}`; });
           if (!controls.children.length) controls.append(el('span', 'Sem ações autorizadas', 'muted'));
           buttons.append(controls); line.append(name, el('td', roles[row.funcao] || row.funcao), contact, el('td', row.ativo ? 'Ativo' : 'Inativo'), buttons);
@@ -172,10 +196,12 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
   }
   async function load(current) {
     const c = await request('/capacidades'); if (current !== generation) return;
-    const [employees, incoming] = await Promise.all([c.consultar ? request('') : Promise.resolve([]), c.associar ? request('/associacoes') : Promise.resolve([])]);
+    const pc = await permissionCall('/capacidades'); if (current !== generation) return;
+    const [legacy, delegated, incoming] = await Promise.all([c.consultar ? request('') : Promise.resolve([]), permissionCall('/alvos'), c.associar ? request('/associacoes') : Promise.resolve([])]);
+    const employees = [...new Map([...legacy, ...delegated].map(row => [row.vinculoId, row])).values()];
     if (current !== generation) return;
     if (!Array.isArray(employees) || !Array.isArray(incoming) || !Array.isArray(c.funcoes)) throw new Error('Resposta inválida');
-    capabilities = c; rows = employees; requests = incoming; render();
+    capabilities = c; permissionCapabilities = pc; rows = employees; requests = incoming; render();
   }
   async function activate(id) {
     reset(); unit = id || null; const current = generation;

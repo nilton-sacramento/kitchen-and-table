@@ -5,7 +5,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-@RestControllerAdvice(assignableTypes=FuncionarioController.class)
+@RestControllerAdvice(assignableTypes={FuncionarioController.class,PermissoesController.class})
 public class FuncionarioExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ProblemDetail> status(ResponseStatusException e) {
