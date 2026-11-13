@@ -18,7 +18,7 @@ Token contents: read; checkout sem persistir credenciais; sem secrets, pull_requ
 
 ## Histórico da transição
 
-O PR #2 foi integrado em develop por autorização, no merge commit 30f788a661e3c72017b1099b62d23cf04c2e95ea. Seu CI passou ainda com o bootstrap, necessário porque aquela branch não tinha backend. Depois, develop foi incorporada na feature com merge commit e o template definitivo foi ativado no próprio PR #1. O PR #1 continua Draft e seu merge não foi autorizado.
+O PR #2 foi integrado em develop por autorização, no merge commit 30f788a661e3c72017b1099b62d23cf04c2e95ea. Seu CI passou ainda com o bootstrap, necessário porque aquela branch não tinha backend. Depois, develop foi incorporada na feature com merge commit e o template definitivo foi ativado no próprio PR #1. Posteriormente, o PR #1 foi integrado na develop em bb34935, e o PR #3 da Entrega 2.1 em 2c4108a, com CI aprovado. A Entrega 2.2 continua sujeita a PR Draft e revisão própria.
 
 O arquivo .github/ci-templates/ci-sem-bootstrap.yml permanece como referência da transição, fora dos workflows ativos. O workflow atual já é a versão sem bootstrap. Os registros anteriores de execuções em bootstrap são evidências históricas, não o comportamento atual desta branch.
 
@@ -36,3 +36,5 @@ mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.spr
 ```
 
 Testes não exigem DB_PASSWORD ou banco operacional. Para executar a aplicação com dados existentes, configurar DB_PASSWORD e manter o contêiner original conforme README; não repetir setup nem recriar volumes.
+
+A feature da Entrega 2.2 amplia a suíte e o smoke para funções e permissões; o total real e o SHA validado devem ser consultados no PR. A validação inclui o novo assets/permissoes.js e V1→V7/V4→V7 somente em PostgreSQL 16 descartável.
