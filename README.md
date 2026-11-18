@@ -16,7 +16,7 @@ Implementado nesta branch:
 
 O catálogo de permissões de produtos, pedidos, caixa e outros módulos futuros não representa operações disponíveis. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
 
-Pendências de interface relatadas incluem restaurar a seção/unidade após F5, preservar rascunhos elegíveis e melhorar a organização das permissões. O [planejamento das correções](docs/planejamento-correcoes-interface.md) não autoriza nem representa sua implementação.
+Esta branch inclui restauração da seção/unidade, rascunhos elegíveis e organização/prévia de permissões, validados com PostgreSQL descartável em 18/11/2026. Consulte [implementação, testes e limites](docs/interface-contexto-permissoes.md); o [planejamento anterior](docs/planejamento-correcoes-interface.md) permanece como referência.
 
 ## Tecnologias
 
@@ -71,11 +71,11 @@ mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.spr
 node scripts/smoke-funcionarios.mjs
 ```
 
-O Maven compila, testa e empacota. A suíte atual contém **137 testes**, incluindo mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
+O Maven compila, testa e empacota. A suíte contém **143 testes Java** (137 anteriores e seis novos), aprovados com Docker/PostgreSQL descartável na validação local de 18/11/2026, sem testes ignorados. A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
 
 A expiração automatizada pode ser executada separadamente com `mvn '-Dtest=SessionInactivityIntegrationTest' test`; o prazo reduzido existe somente no teste. O prazo administrativo normal permanece 30 minutos.
 
-Os testes manuais mantêm **53 aprovações conciliadas** e pendências **T38, T50, T51 e T57**. Isso é independente da aprovação automatizada. Roteiro, CSV, conciliação, relatórios e capturas ficam em `tests/manual/etapa-2.3/`, somente locais e ignorados pelo Git. Consulte os [guias dos testes](docs/organizacao-testes.md) e [scripts](scripts/README.md).
+Os testes manuais têm **57 aprovações conciliadas** em 18/11/2026: 19 confirmadas pelo proprietário, 34 execuções assistidas históricas e quatro pendências posteriormente comprovadas. O T50 incluiu reidentificação segura na nova aba bloqueada, troca real de Atendente para Caixa e retorno à primeira sem dados. Isso não representa repetição dos 57 casos no mesmo cenário. Isso é independente da aprovação automatizada. Roteiro, CSV, conciliação, relatórios e capturas ficam em `tests/manual/etapa-2.3/`, somente locais e ignorados pelo Git. Consulte os [guias dos testes](docs/organizacao-testes.md) e [scripts](scripts/README.md).
 
 ## Segurança e limites
 

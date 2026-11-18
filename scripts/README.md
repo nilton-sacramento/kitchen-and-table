@@ -27,3 +27,9 @@ node --check src/main/resources/static/assets/operacional.js
 ```
 
 O frontend é servido pelo Spring Boot e não requer um processo Node em execução. Os scripts privados Iniciar/Parar/Status/Abrir-* do ambiente manual permanecem em .tools/testes-manuais-2-3. Não são dependências do CI nem ferramentas de produção. Consulte [instalação](../docs/instalacao-local.md), [estrutura](../docs/estrutura-projeto.md) e [testes](../docs/organizacao-testes.md).
+
+## Testes de contexto e formulários
+
+`node --test scripts/test-interface-contexto.mjs`: testes puros de contexto/drafts.
+
+`node scripts/test-interface-browser.mjs`: Chrome real com API controlada de teste, sem PostgreSQL. Evidências e perfil exclusivo permanecem ignorados em .tools/missao-2026-11-18; não são apagados automaticamente. Esse teste não valida o backend nem altera aprovações manuais.

@@ -1,6 +1,6 @@
 ﻿# Planejamento das correções funcionais após a reorganização
 
-Status: somente planejamento. A reorganização foi concluída e validada antes deste documento. Nenhum código funcional foi alterado. Implementação depende de autorização específica do proprietário.
+Status histórico: planejamento anterior à missão de 18/11/2026. A implementação local foi autorizada posteriormente; consulte [o estado efetivo e os bloqueios](interface-contexto-permissoes.md). O conteúdo abaixo registra a proposta original e não deve ser interpretado como prova de implementação ou validação.
 
 ## Base e limites
 

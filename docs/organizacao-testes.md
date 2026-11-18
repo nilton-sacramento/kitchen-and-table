@@ -24,3 +24,13 @@ A pasta .ci-validation é um worktree Git registrado e não um temporário comum
 ## Validação da reorganização
 
 Maven verify aprovado com 137 testes, sem falhas, erros ou ignorados; smoke Chrome existente concluído com saída 0. Relatório local em tests/manual/etapa-2.3/relatorios/REORGANIZACAO.md. Planejamento posterior em docs/planejamento-correcoes-interface.md; nenhuma correção funcional implementada.
+
+## Regressões de interface da missão de 18/11
+
+`node --test scripts/test-interface-contexto.mjs` testa lógica sem DOM. `node scripts/test-interface-browser.mjs` serve o frontend real em Chrome com API controlada, sem substituir a integração real. Ambos mantêm artefatos locais em .tools/missao-2026-11-18. Consulte [resultados e bloqueios](interface-contexto-permissoes.md). O smoke real continua obrigatório.
+
+## Recuperação e auditoria final de 18/11/2026
+
+O cenário antigo não foi recuperado. Um cenário novo e isolado de PostgreSQL 16, com dados sintéticos, permanece em .tools/testes-manuais-2-3/cenarios/recuperacao-2026-11-18. Seus dados e credenciais não são os históricos. Para consultar o controlador ativo, usar Controlar.ps1 -Acao status -Cenario recuperacao-2026-11-18. Não executar o Iniciar/Finalizar padrão supondo acessar esse cenário.
+
+O consolidado final dos 57 casos, o procedimento complementar do T50 e as evidências ficam somente locais em tests/manual/etapa-2.3/relatorios/auditoria-final-2026-11-18 e evidencias/auditoria-final-2026-11-18. O CSV e o roteiro originais permanecem intactos. T01–T19 vêm da confirmação do proprietário; T20–T57 combinam evidências assistidas e retomadas documentadas. A nova aba operacional pode exigir PIN porque ocultar a anterior bloqueia a sessão compartilhada; reidentificar o Atendente antes de Trocar operador não dispensa controles de segurança.

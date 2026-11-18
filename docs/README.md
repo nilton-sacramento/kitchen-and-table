@@ -10,6 +10,7 @@
 - [Contribuição](../CONTRIBUTING.md)
 - [Scripts de validação](../scripts/README.md)
 - [Organização e execução dos testes](organizacao-testes.md)
+- [Diagnóstico Docker/WSL e retomada segura dos testes](diagnostico-docker-testes.md)
 
 ## Arquitetura e entregas
 
@@ -19,7 +20,8 @@
 - [Entrega 2.2 — funções e permissões](entrega-2-2.md)
 - [Revisão final da Entrega 2.2](revisao-final-entrega-2-2.md)
 - [Entrega 2.3 — PIN e segurança operacional](entrega-2-3.md)
-- [Correções de interface planejadas, não implementadas](planejamento-correcoes-interface.md)
+- [Contexto, rascunhos e permissões — implementação local, validação e limites](interface-contexto-permissoes.md)
+- [Planejamento anterior das correções](planejamento-correcoes-interface.md)
 
 ## Segurança, CI e GitHub
 
