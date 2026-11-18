@@ -1,5 +1,8 @@
 # Fluxo de publicação — sem push executado nesta preparação
 
+Registro histórico da preparação da Etapa 1. As branches, comandos e estado remoto abaixo descrevem aquela sessão, não o estado atual. Para o fluxo atual, consulte [CONTRIBUTING.md](../CONTRIBUTING.md), [CI definitivo](ci.md) e [README](../README.md). Nesta revisão, a publicação é autorizada somente em feature/entrega-2-3-pin-seguranca; nenhum merge em develop/main ou deploy está autorizado.
+
+
 ## Estado de partida confirmado
 
 main, develop e feature/etapa-1-autenticacao partiram do commit ba275cd3b08b4e56c5b59628935b74378de8985d. A branch ativa é feature/etapa-1-autenticacao. O remoto origin é https://github.com/nilton-sacramento/kitchen-and-table.git. A consulta remota nesta preparação encontrou somente main nesse commit.

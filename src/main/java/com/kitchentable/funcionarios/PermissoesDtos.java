@@ -11,6 +11,7 @@ public final class PermissoesDtos {
     public record Limites(boolean adicionais,@NotNull @Size(max=500) List<@NotNull UUID> alvos,
         @NotNull @Size(max=100) List<@jakarta.validation.Valid LimiteCodigo> permissoes,@NotNull @PositiveOrZero Long versao) {}
     public record Catalogo(String codigo,String nome,String descricao,String modulo,String categoria,boolean critica,boolean disponivel,boolean exclusivaProprietario) {}
+    public record Padrao(String funcao,List<Catalogo> permissoes) {}
     public record Efetiva(Catalogo permissao,List<String> herdadaDe,Estado estado,boolean configurada,boolean efetiva,String restricao) {}
     public record Painel(UUID vinculoId,String nome,String principal,List<String> adicionais,long versao,List<Efetiva> permissoes,
         boolean alterarAdicionais,boolean definirLimites,List<String> conceder,List<String> revogar) {}

@@ -55,9 +55,16 @@ jobs:
       - name: Sintaxe JavaScript
         run: |
           node --check src/main/resources/static/assets/app.js
+          node --check src/main/resources/static/assets/interface-contexto.js
           node --check src/main/resources/static/assets/funcionarios.js
           node --check src/main/resources/static/assets/permissoes.js
+          node --check src/main/resources/static/assets/operacional.js
+          node --check src/main/resources/static/assets/seguranca-operacional.js
+          node --check scripts/smoke-operacional.mjs
           node --check scripts/smoke-funcionarios.mjs
+
+      - name: Testes de contexto e rascunhos
+        run: node --test scripts/test-interface-contexto.mjs
 
       - name: Compilacao, testes e empacotamento
         run: mvn --batch-mode --no-transfer-progress -Ddebug=false -Dlogging.level.org.springframework=INFO verify

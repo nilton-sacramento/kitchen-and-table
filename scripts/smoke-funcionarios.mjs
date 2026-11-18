@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
+import { smokeOperational } from './smoke-operacional.mjs';
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const tools = path.resolve('.tools');
 const artifacts = path.join(tools, 'browser-artifacts');
@@ -13,6 +14,7 @@ const rawClasspath = report.match(/<property name="java.class.path" value="([^"]
 if (!rawClasspath) throw new Error('Execute Maven verify antes do smoke.');
 const classpath = rawClasspath.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 const credential = { email: `browser-${crypto.randomUUID()}@example.com`, password: crypto.randomUUID(), managerEmail: `manager-${crypto.randomUUID()}@example.com`, managerPassword: crypto.randomUUID() };
+credential.pin=String(crypto.randomInt(0,1000000)).padStart(6,'0');credential.secondPin=String(crypto.randomInt(0,1000000)).padStart(6,'0');
 const java = spawn('java', ['-cp', classpath, 'com.kitchentable.funcionarios.FuncionariosBrowserFixture'], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
 java.stderr.on('data', () => {}); // Nunca encaminhar ambiente/credenciais ou logs brutos.
 const lines = readline.createInterface({ input: java.stdout });
@@ -41,7 +43,7 @@ async function evaluate(expression) {
 }
 async function wait(expression, description) {
   for (let i = 0; i < 100; i++) { if (await evaluate(expression) && await evaluate("document.getElementById('employee-view')?.getAttribute('aria-busy')!=='true'")) return; await pause(150); }
-  const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState})").catch(() => ({}));
+  const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState,operationalHidden:document.getElementById('op-protected')?.hidden,operationalError:document.getElementById('op-error')?.textContent,operationalState:document.getElementById('op-state')?.textContent})").catch(() => ({}));
   console.log('DIAGNOSTIC:', JSON.stringify(diagnostic));
   throw new Error(`Tempo esgotado: ${description}`);
 }
@@ -79,7 +81,7 @@ try {
     const data = JSON.parse(event.data);
     if (data.method === 'Runtime.exceptionThrown') {
       const error = data.params.exceptionDetails.exception;
-      const safe = String(error?.description || data.params.exceptionDetails.text).split('\n')[0].replaceAll(credential.email, '[fixture]').replaceAll(credential.password, '[fixture]').replaceAll(credential.managerEmail, '[fixture]').replaceAll(credential.managerPassword, '[fixture]');
+      const safe = String(error?.description || data.params.exceptionDetails.text).split('\n')[0].replaceAll(credential.email, '[fixture]').replaceAll(credential.password, '[fixture]').replaceAll(credential.managerEmail, '[fixture]').replaceAll(credential.managerPassword, '[fixture]').replaceAll(credential.pin, '[fixture]').replaceAll(credential.secondPin, '[fixture]');
       console.log('BROWSER_ERROR:', safe);
     }
     const item = pending.get(data.id); if (!item) return;
@@ -110,7 +112,7 @@ try {
   await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Ativar').click();true");
   await wait("document.querySelector('.employee-table tbody tr')?.children[3]?.textContent==='Ativo'", 'reativação');
   pass('ativação e desativação integradas');
-  await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Função').click();document.getElementById('employee-funcao').value='GERENTE';document.querySelector('.employee-form').requestSubmit();true");
+  await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Função principal').click();document.getElementById('employee-funcao').value='GERENTE';document.querySelector('.employee-form').requestSubmit();true");
   await wait("document.querySelector('.employee-table tbody tr')?.children[1]?.textContent==='Gerente'", 'promoção pelo proprietário');
   await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Limites do gerente').click();true");
   await wait("document.querySelectorAll('.employee-form input[type=checkbox]').length===10", 'limites administrativos');
@@ -151,7 +153,7 @@ try {
       await press('Escape', 'Escape', 27);
       if (!(await evaluate("document.querySelector('[data-editor]').hidden && document.activeElement?.textContent==='Editar'"))) throw new Error('Escape nao devolveu foco.');
       await press('Tab', 'Tab', 9);
-      if (!(await evaluate("document.activeElement?.textContent==='Função'"))) throw new Error('Ordem de Tab incorreta.');
+      if (!(await evaluate("document.activeElement?.textContent==='Função principal'"))) throw new Error('Ordem de Tab incorreta.');
       await evaluate("document.getElementById('menu-toggle').focus();true");
       await press('Enter', 'Enter', 13);
       if (!(await evaluate("document.getElementById('menu-toggle').getAttribute('aria-expanded')==='true'"))) throw new Error('Menu mobile nao abriu pelo teclado.');
@@ -177,7 +179,7 @@ try {
     await wait("!!document.querySelector('.permission-card')", 'painel real de permissoes');
   }
   await permissionPanel();
-  await evaluate("const field=[...document.querySelectorAll('.permission-form fieldset label')].find(l=>l.textContent==='BAR').querySelector('input');field.checked=true;[...document.querySelectorAll('.permission-form button')].find(b=>b.textContent==='Salvar funções adicionais').click();true");
+  await evaluate("const field=document.querySelector('.permission-form input[data-role=BAR]');field.checked=true;[...document.querySelectorAll('.permission-form button')].find(b=>b.textContent==='Salvar funções adicionais').click();true");
   await wait("document.querySelector('[data-message]')?.textContent.startsWith('Funções adicionais atualizadas.')", 'funcoes adicionais');
   await permissionPanel();
   if (!(await evaluate("document.querySelector('[data-code=PRODUTO_CONSULTAR]').textContent.includes('BAR')"))) throw new Error('Heranca de adicional nao exibida.');
@@ -262,11 +264,13 @@ try {
   await evaluate("var card=document.querySelector('[data-code=PRODUTO_CONSULTAR]');card.querySelector('button').click();true");
   await wait("document.querySelector('[data-message]')?.classList.contains('error') && !document.querySelector('.permission-card')",'revogacao com editor aberto');
   if (!(await evaluate("![...document.querySelectorAll('.employee-table button')].some(b=>b.textContent==='Funções e permissões')")))throw new Error('Controles revogados permaneceram');
-  ownerSocket.close();await browserCommand('Target.disposeBrowserContext',{browserContextId:context.browserContextId});
+
   pass('permissoes: backend bloqueia gerente, concessao e revogacao em sessao aberta');
   // Voltar ao proprietario para repetir o logout/senha incorreta originais.
   await evaluate(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();await fetch('/api/v1/auth/logout',{method:'POST',headers:{[c.headerName]:c.token}});const fresh=await(await fetch('/api/v1/auth/csrf')).json();return(await fetch('/api/v1/auth/login',{method:'POST',headers:{[fresh.headerName]:fresh.token},body:new URLSearchParams({email:${JSON.stringify(credential.email)},password:${JSON.stringify(credential.password)}})})).status})()`);
   await cdp('Page.reload');await wait("!document.getElementById('app-view').hidden",'retorno ao proprietario');
+  await smokeOperational({fixture,targetLink,credential,cdp,evaluate,wait,press,pause,pass,ownerEval,artifacts,fs,path});
+  ownerSocket.close();await browserCommand('Target.disposeBrowserContext',{browserContextId:context.browserContextId});
   await evaluate("document.getElementById('logout').click();true");
   await wait("document.getElementById('app-view').hidden && !document.getElementById('login-view').hidden", 'logout');
   await cdp('Page.reload');

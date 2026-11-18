@@ -1,4 +1,6 @@
-# Autenticação por sessão — Etapa 1
+# Autenticação por sessão — base da Etapa 1
+
+Este guia descreve a base preservada. Funcionários, permissões e PIN foram ampliados nas [Entregas 2.1](entrega-2-1.md), [2.2](entrega-2-2.md) e [2.3](entrega-2-3.md); consulte também a [instalação atual](instalacao-local.md).
 
 Esta versão substitui HTTP Basic por sessão HTTP do Spring Security. Não altera tabelas, usuários, hashes de senha nem vínculos. A tabela `sessoes` existente não é usada; sessões ficam na memória do servidor. Reiniciar o processo encerra as sessões. Em múltiplas instâncias será necessário armazenamento compartilhado de sessões, a definir antes de produção.
 
@@ -17,13 +19,15 @@ Ao abrir ou atualizar a página, o frontend consulta a sessão no servidor. Nave
 
 ## Configuração local
 
-Configure DB_PASSWORD no terminal conforme o README (sem senha padrão). No terminal VS Code que executa o Spring Boot, pare o processo com Ctrl+C e execute na raiz:
+Configure DB_PASSWORD no terminal conforme o README (sem senha padrão). Somente em banco novo de desenvolvimento autorizado, use a configuração descrita no guia de instalação e execute na raiz:
 
 ```powershell
 mvn spring-boot:run
 ```
 
-Abra http://localhost:8080 e pressione Ctrl+F5 para obter o JavaScript atualizado. Use o proprietário existente. Não recrie banco nem execute setup.
+No ambiente manual existente, use os scripts privados em .tools/testes-manuais-2-3 em vez desse comando, preservando o cenário.
+
+Abra http://localhost:8080 e pressione Ctrl+F5 para obter o JavaScript atualizado. Use a conta do ambiente de desenvolvimento autorizado. Não acessar o PostgreSQL operacional, recriar banco ou repetir setup.
 
 - `KT_SESSION_TIMEOUT`: padrão `30m`, expiração por inatividade no servidor. Requisições da sessão renovam a contagem.
 - `KT_COOKIE_SECURE`: padrão `false` exclusivamente para HTTP local. Em ambiente HTTPS configurar `true`; TLS e proxies devem ser revisados antes de qualquer publicação. Não usar `true` no HTTP local, pois o cookie não será enviado.
@@ -32,27 +36,15 @@ Abra http://localhost:8080 e pressione Ctrl+F5 para obter o JavaScript atualizad
 ## Roteiro no navegador, um teste por vez
 
 1. Login correto: dashboard com dados existentes do proprietário.
-2. F5: continua autenticado e abre Visão geral.
+2. F5: continua autenticado; a interface atual abre Visão geral. Preservar a seção e a unidade selecionadas é uma melhoria planejada, ainda não implementada.
 3. Sair: volta ao formulário.
 4. Após sair, F5 continua no formulário; abrir `/api/v1/auth/me` ou `/api/v1/estabelecimentos` retorna 401, sem dados.
 5. Senha incorreta: erro e nenhum dashboard.
-6. Expiração: só depois dos anteriores, pare o servidor. No mesmo terminal, configure temporariamente:
-
-```powershell
-$env:KT_SESSION_TIMEOUT = '1m'
-mvn spring-boot:run
-```
-
-Faça login. Deixe todas as abas do sistema sem uso por pelo menos dois minutos (o contêiner verifica a expiração periodicamente). Pressione F5: deve voltar ao login. Após o teste, pare o servidor e restaure o padrão:
-
-```powershell
-Remove-Item Env:KT_SESSION_TIMEOUT -ErrorAction SilentlyContinue
-mvn spring-boot:run
-```
+6. Expiração normal: no ambiente descartável, mantenha o prazo de 30 minutos. Após login, aguarde 31 minutos completos sem interação ou requisição no mesmo perfil. Retornar à aba visível pode revalidar e renovar a sessão; se houver renovação durante a espera, contar novamente ou registrar pendência. Depois F5 deve exigir login e `/api/v1/auth/me` deve retornar 401. Não alterar o relógio nem a configuração normal. No roteiro manual atual, T57 continua pendente de execução pessoal.
 
 ## Verificação automatizada e limites
 
-`mvn test` verifica autenticação, proteção da API, CSRF real, rotação do ID, persistência da sessão e invalidação pelo logout. `SessionInactivityIntegrationTest` inicia Tomcat real em porta aleatória, somente em 127.0.0.1, com cliente HTTP e cookies reais. Um listener exclusivo do teste reduz o timeout de cada sessão para dois segundos; após 3,2 segundos sem requisições, a conta e os estabelecimentos devem retornar 401. O teste não chama invalidate(), não altera o application.yml e não conecta ao PostgreSQL. Também confere HttpOnly e SameSite=Lax no Set-Cookie real. A configuração normal permanece 30 minutos. Os demais testes usam MockMvc; todos usam dependências de banco simuladas, sem modificar dados. `node --check src/main/resources/static/assets/app.js` verifica sintaxe, se Node estiver disponível.
+`mvn test` verifica autenticação, proteção da API, CSRF real, rotação do ID, persistência da sessão e invalidação pelo logout. `SessionInactivityIntegrationTest` inicia Tomcat real em porta aleatória, somente em 127.0.0.1, com cliente HTTP e cookies reais. Um listener exclusivo do teste reduz o timeout de cada sessão para dois segundos; após 3,2 segundos sem requisições, a conta e os estabelecimentos devem retornar 401. O teste não chama invalidate(), não altera o application.yml e não conecta ao PostgreSQL. Também confere HttpOnly e SameSite=Lax no Set-Cookie real. A configuração normal permanece 30 minutos. Os demais testes de autenticação da Etapa 1 usam MockMvc e dependências de banco simuladas. As integrações acrescentadas nas entregas seguintes usam PostgreSQL 16 descartável, sem acessar o banco operacional. `node --check src/main/resources/static/assets/app.js` verifica sintaxe, se Node estiver disponível.
 
 Para repetir apenas a expiração automatizada, no PowerShell da raiz do projeto:
 
@@ -62,4 +54,4 @@ mvn '-Dtest=SessionInactivityIntegrationTest' test
 
 Não é necessário parar o servidor da porta 8080 nem mudar variáveis de ambiente para esse teste.
 
-Permissões granulares, revogação por mudança de função/desativação, recuperação de senha, limitação de tentativas e sessões distribuídas continuam pendentes. Sessão autenticada não concede acesso por estabelecimento automaticamente: futuros endpoints devem validar vínculo ativo e permissões a cada operação. Não avançar para esses módulos sem autorização.
+Permissões por unidade, delegações, revogação de acesso e bloqueios operacionais foram ampliados nas entregas seguintes. Recuperação administrativa de senha, proteção global contra tentativas em massa e sessões distribuídas continuam pendentes. Sessão autenticada não concede acesso automático a qualquer estabelecimento: operações protegidas devem revalidar vínculo e autoridade no backend. Não iniciar módulos futuros sem autorização.

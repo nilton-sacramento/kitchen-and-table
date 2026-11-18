@@ -74,11 +74,16 @@ public class PermissoesService {
                 restricao=permitida?"Limitada aos alvos e codigos delegados":"Exclusiva do proprietario ou fluxo de delegacao protegido";
                 if(estado==Estado.NEGAR)permitida=false;
             }
+            if(p.modulo().equals("SEGURANCA")&&!dono&&!gerente){permitida=false;restricao="Exige autoridade administrativa principal e permissao explicita";}
             if(dono){permitida=true;origens.add("AUTORIDADE_PROPRIETARIO");}
             if(!ativo||(!dono&&unidadeNegada)){permitida=false;restricao="Vinculo inativo ou acesso a unidade revogado";}
             if(!p.disponivel()){permitida=false;restricao="Contrato futuro ou legado inativo; nenhuma operacao habilitada";}
             resultado.add(new Efetiva(p,List.copyOf(origens),estado,configurada,permitida,restricao));
         }return resultado;
+    }
+    List<Efetiva> operacionais(UUID unidade,UUID vinculo){
+        var rows=repo.jdbc().query("SELECT f.codigo FROM usuarios_estabelecimentos ue JOIN usuarios u ON u.id=ue.usuario_id JOIN estabelecimentos e ON e.id=ue.estabelecimento_id JOIN funcoes f ON f.id=ue.funcao_id WHERE ue.id=? AND ue.estabelecimento_id=? AND ue.ativo AND u.ativo AND e.ativo",(rs,i)->rs.getString(1),vinculo,unidade);
+        return rows.isEmpty()?List.of():calcular(vinculo,rows.get(0));
     }
     boolean podeExistente(UUID vinculo,String codigo){
         var rows=repo.jdbc().query("SELECT f.codigo FROM usuarios_estabelecimentos ue JOIN usuarios u ON u.id=ue.usuario_id JOIN estabelecimentos e ON e.id=ue.estabelecimento_id JOIN funcoes f ON f.id=ue.funcao_id WHERE ue.id=? AND ue.ativo AND u.ativo AND e.ativo",(rs,i)->rs.getString(1),vinculo);
@@ -87,6 +92,19 @@ public class PermissoesService {
     void exigirExistente(UUID vinculo,String codigo){if(!podeExistente(vinculo,codigo))throw erro(HttpStatus.FORBIDDEN,"Permissao revogada ou nao autorizada");}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public List<Catalogo> catalogo(UUID unidade,String email){ator(unidade,email,false);return catalogo();}
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public List<Padrao> padroes(UUID unidade,String email){
+        var a=ator(unidade,email,false);
+        exigirExistente(a.vinculo(),"ESTABELECIMENTO_VISUALIZAR");
+        var catalogo=catalogo();
+        List<Padrao> resultado=new ArrayList<>();
+        for(var funcao:List.of("ATENDENTE","CAIXA","COZINHA","BAR","GERENTE")){
+            var codigos=repo.jdbc().queryForList("SELECT p.codigo FROM funcoes_permissoes fp JOIN permissoes p ON p.id=fp.permissao_id JOIN funcoes f ON f.id=fp.funcao_id WHERE f.codigo=?",String.class,funcao);
+            resultado.add(new Padrao(funcao,catalogo.stream().filter(p->codigos.contains(p.codigo())).toList()));
+        }
+        return resultado;
+    }
+
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Capacidades capacidades(UUID unidade,String email){var a=ator(unidade,email,false);return new Capacidades(a.dono(),podeExistente(a.vinculo(),"FUNCIONARIO_FUNCAO_PRINCIPAL_ALTERAR"),a.dono()?List.of():repo.jdbc().queryForList("SELECT alvo_id FROM limites_gestao_alvos WHERE gerente_id=? ORDER BY alvo_id",UUID.class,a.vinculo()));}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
@@ -125,6 +143,11 @@ public class PermissoesService {
         }
         if(dto.estado()==Estado.HERDAR)repo.jdbc().update("DELETE FROM usuarios_permissoes WHERE vinculo_id=? AND permissao_id=(SELECT id FROM permissoes WHERE codigo=?)",id,codigo);
         else repo.jdbc().update("INSERT INTO usuarios_permissoes(vinculo_id,permissao_id,permitido) SELECT ?,id,? FROM permissoes WHERE codigo=? ON CONFLICT(vinculo_id,permissao_id) DO UPDATE SET permitido=EXCLUDED.permitido",id,dto.estado()==Estado.PERMITIR,codigo);
+        if(codigo.equals("ESTABELECIMENTO_VISUALIZAR")&&dto.estado()==Estado.NEGAR){
+            repo.jdbc().update("UPDATE credenciais_operacionais SET versao=versao+1 WHERE vinculo_id=?",id);
+            int encerradas=repo.jdbc().update("UPDATE sessoes_operacionais SET bloqueada=true,encerrada=true WHERE vinculo_id=? AND NOT encerrada",id);
+            if(encerradas>0)audit.registrar(unidade,a.id(),a.vinculo(),"OPERACIONAL_PERMISSAO_REVOGADA",id,null,Map.of("sessoesRevogadas",encerradas));
+        }
         concluir(unidade,a,id,"PERMISSAO_INDIVIDUAL_ALTERADA",Map.of("codigo",codigo,"estado",antes),Map.of("codigo",codigo,"estado",dto.estado()));return painel(a,repo.buscar(unidade,id));
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)

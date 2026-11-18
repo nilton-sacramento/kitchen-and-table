@@ -98,7 +98,7 @@ class FuncionariosPostgresTest {
         assertEquals(LEGACY_HASH,jdbc.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(LEGACY_EMAIL,jdbc.queryForObject("SELECT email FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(0L,jdbc.queryForObject("SELECT versao FROM usuarios_estabelecimentos WHERE id=?",Long.class,LEGACY_LINK));
-        assertEquals(8,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
+        assertEquals(10,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
         assertTrue(jdbc.queryForObject("SELECT version()",String.class).contains("PostgreSQL 16"));
         mvc.perform(get("/api/v1/auth/me").session(login(LEGACY_EMAIL))).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(LEGACY_USER.toString()));
     }
@@ -553,7 +553,7 @@ class FuncionariosPostgresTest {
         mvc.perform(put(base+"/funcionarios/"+id(f)+"/individuais/PRODUTO_CONSULTAR").session(ownerSession).with(csrf()).contentType("application/json").content("{\"estado\":\"INVENTADO\",\"versao\":0}")).andExpect(status().isBadRequest());
     }
     @Test void catalogoPreservaLegadosSemAutoridadeAutomatica() {
-        var catalog=permissoes.catalogo(a,ownerEmail);assertEquals(52,catalog.size());
+        var catalog=permissoes.catalogo(a,ownerEmail);assertEquals(56,catalog.size());
         for(String c:List.of("FUNCIONARIO_GERENCIAR","PERMISSAO_GERENCIAR"))assertFalse(catalog.stream().filter(p->p.codigo().equals(c)).findFirst().orElseThrow().disponivel());
         assertTrue(permissoes.minhas(a,managerEmail).stream().filter(p->p.permissao().categoria().equals("ADMINISTRATIVA")&&!p.permissao().codigo().equals("ESTABELECIMENTO_VISUALIZAR")).noneMatch(PermissoesDtos.Efetiva::efetiva));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM funcoes_permissoes fp JOIN permissoes p ON p.id=fp.permissao_id WHERE p.categoria='FINANCEIRA'",Integer.class));
@@ -576,7 +576,7 @@ class FuncionariosPostgresTest {
         assertEquals(before,db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4') ORDER BY installed_rank"));
         assertEquals(LEGACY_HASH,db.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,user));assertTrue(db.queryForObject("SELECT consultar FROM delegacoes_administrativas WHERE vinculo_id=?",Boolean.class,link));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM limites_gestao_permissoes",Integer.class));
-        assertEquals(8,db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+        assertEquals(10,db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
     }
     @Test void falhaAuditoriaTambemReverteAdicionaisELimites() throws Exception {
         var f=create(a,"Pessoa","ATENDENTE");
@@ -667,4 +667,25 @@ class FuncionariosPostgresTest {
     }
     @Test void principalConcorrenteComAdicionalMantemIntegridadeNoBanco() throws Exception {verificarConcorrenciaDiretaDeFuncoes(true);}
     @Test void adicionalConcorrenteComPrincipalMantemIntegridadeNoBanco() throws Exception {verificarConcorrenciaDiretaDeFuncoes(false);}
+
+    @Test
+    void previaDeFuncaoUsaPadroesDoBancoSemConcederAcessos() throws Exception {
+        int antes=jdbc.queryForObject("SELECT count(*) FROM usuarios_permissoes",Integer.class);
+        var padroes=permissoes.padroes(a,ownerEmail);
+        assertEquals(Set.of("ATENDENTE","CAIXA","COZINHA","BAR","GERENTE"),padroes.stream().map(PermissoesDtos.Padrao::funcao).collect(java.util.stream.Collectors.toSet()));
+        for(var padrao:padroes){
+            var banco=new HashSet<>(jdbc.queryForList("SELECT p.codigo FROM funcoes_permissoes fp JOIN funcoes f ON f.id=fp.funcao_id JOIN permissoes p ON p.id=fp.permissao_id WHERE f.codigo=?",String.class,padrao.funcao()));
+            assertEquals(banco,padrao.permissoes().stream().map(PermissoesDtos.Catalogo::codigo).collect(java.util.stream.Collectors.toSet()));
+        }
+        assertEquals(antes,jdbc.queryForObject("SELECT count(*) FROM usuarios_permissoes",Integer.class));
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/padroes").session(ownerSession)).andExpect(status().isOk());
+    }
+    @Test
+    void previaDeFuncaoExigeSessaoEVinculoNaUnidade() throws Exception {
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/padroes")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/estabelecimentos/"+UUID.randomUUID()+"/permissoes/padroes").session(ownerSession)).andExpect(status().isNotFound());
+        var painel=permissoes.painel(a,managerLink,ownerEmail);
+        permissoes.excecao(a,managerLink,"ESTABELECIMENTO_VISUALIZAR",ownerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,painel.versao()));
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/padroes").session(managerSession)).andExpect(status().isForbidden());
+    }
 }

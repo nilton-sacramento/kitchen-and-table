@@ -72,8 +72,9 @@ public class FuncionarioService {
     }
     public Funcionario situacao(UUID unidade,UUID vinculo,String email,Situacao dto) {
         var ator=iniciar(unidade,email,dto.ativo()?"ativar":"desativar");var antes=repo.buscar(unidade,vinculo);auth.alvo(ator,antes);repo.verificarVersao(antes,dto.versao());
-        repo.situacao(unidade,vinculo,dto.ativo());var depois=repo.buscar(unidade,vinculo);
-        evento(unidade,ator,dto.ativo()?"FUNCIONARIO_ATIVADO":"FUNCIONARIO_DESATIVADO",vinculo,antes,depois);return depois;
+        int revogadas=repo.situacao(unidade,vinculo,dto.ativo());var depois=repo.buscar(unidade,vinculo);
+        evento(unidade,ator,dto.ativo()?"FUNCIONARIO_ATIVADO":"FUNCIONARIO_DESATIVADO",vinculo,antes,depois);
+        if(revogadas>0)evento(unidade,ator,"OPERACIONAL_VINCULO_DESATIVADO",vinculo,null,Map.of("sessoesRevogadas",revogadas));return depois;
     }
     public Funcionario funcao(UUID unidade,UUID vinculo,String email,Funcao dto) {
         var ator=iniciar(unidade,email,"editar");var antes=repo.buscar(unidade,vinculo);auth.alvo(ator,antes);auth.funcaoPermitida(ator,dto.funcao());repo.verificarVersao(antes,dto.versao());

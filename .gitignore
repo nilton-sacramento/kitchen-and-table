@@ -44,3 +44,6 @@ backups/
 .ci-validation/
 .tools/
 _ci/
+
+# Materiais locais dos testes manuais: resultados, evidências e histórico privado
+/tests/manual/etapa-2.3/

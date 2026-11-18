@@ -1,3 +1,4 @@
+import { readNavigation, authorizedUnit, navigationHash, createDraftStore } from './interface-contexto.js';
 import { createEmployeeScreen } from './funcionarios.js';
 const $ = (id) => document.getElementById(id);
 const modules = [
@@ -14,10 +15,23 @@ const modules = [
 ];
 const roles = { PROPRIETARIO: 'Proprietário', GERENTE: 'Gerente', ATENDENTE: 'Atendente', CAIXA: 'Operador de caixa', COZINHA: 'Cozinha', BAR: 'Bar' };
 let authenticated = false;
+let identity = null;
+let currentPage = 'dashboard';
+let navigationRequest = 0;
+let restoring = null;
+let restoreAgain = false;
+let draftStorage;
+try { draftStorage = window.sessionStorage; } catch { draftStorage = null; }
+const drafts = createDraftStore(draftStorage);
+let authEvents;
+try { authEvents = new BroadcastChannel('kt.session.events'); authEvents.onmessage = event => { if (event.data?.type === 'logout') logout('', false); }; } catch { /* Revalidação pelo backend continua obrigatória. */ }
+const pageIds = ['dashboard', ...modules.map(m => m[0])];
+const requestedContext = () => readNavigation(location.hash, pageIds);
+function rememberContext(mode = 'replace') { const hash = navigationHash(currentPage, $('establishment-select').value); if (location.hash !== hash) history[mode === 'push' ? 'pushState' : 'replaceState'](null, '', location.pathname + location.search + hash); }
 let establishments = [];
 let generation = 0;
 let loadingEstablishments = false;
-const employeeScreen = createEmployeeScreen({ root: $('employee-view'), api: getApi, getEstablishments: () => establishments, onExpired: () => logout('Sua sessão expirou. Entre novamente.') });
+const employeeScreen = createEmployeeScreen({ root: $('employee-view'), api: getApi, getEstablishments: () => establishments, drafts, onExpired: () => logout('Sua sessão expirou. Entre novamente.') });
 
 class ApiError extends Error {
   constructor(status, detail) { super('Falha na requisição'); this.status = status; this.detail = detail; }
@@ -63,13 +77,18 @@ function showLoginError(message) {
   $('login-error').hidden = false;
 }
 
-function logout(message = '') {
+function logout(message = '', notify = true) {
+  if (notify) authEvents?.postMessage({ type: 'logout' });
   employeeScreen.reset();
+  drafts.clear(); identity = null; restoreAgain = false;
+  history.replaceState(null, '', location.pathname + location.search);
   generation++;
   authenticated = false;
   establishments = [];
   loadingEstablishments = false;
   $('login-form').reset();
+  $('login-submit').disabled = false;
+  $('login-form').removeAttribute('aria-busy');
   $('password').type = 'password';
   $('show-password').textContent = 'Mostrar senha';
   $('show-password').setAttribute('aria-pressed', 'false');
@@ -89,7 +108,10 @@ function closeMenu() {
   $('menu-toggle').setAttribute('aria-expanded', 'false');
 }
 
-function showPage(id, focus = true) {
+function showPage(id, focus = true, historyMode = 'push') {
+  currentPage = pageIds.includes(id) ? id : 'dashboard';
+  id = currentPage;
+  rememberContext(historyMode);
   const module = modules.find((item) => item[0] === id);
   const dashboard = !module;
   const employees = id === 'funcionarios';
@@ -120,30 +142,28 @@ function showPage(id, focus = true) {
 }
 
 async function openPage(id) {
+  const request = ++navigationRequest;
   const current = generation;
   try {
     await getApi('auth/me');
-    if (current === generation && authenticated) showPage(id);
+    if (current === generation && request === navigationRequest && authenticated) showPage(id);
   } catch (error) {
-    if (current !== generation) return;
+    if (current !== generation || request !== navigationRequest) return;
     if (error.status === 401) logout('Sua sessão expirou ou foi encerrada. Entre novamente.');
-    else {
-      $('data-error-text').textContent = errorMessage(error);
-      $('data-error').hidden = false;
-    }
+    else { $('data-error-text').textContent = errorMessage(error); $('data-error').hidden = false; }
   }
 }
 
-function selectEstablishment() {
+function selectEstablishment(activate = true) {
   const selected = establishments.find((item) => item.id === $('establishment-select').value);
   $('establishment-name').textContent = selected?.nome || 'Nenhum estabelecimento vinculado';
   const role = selected ? (roles[selected.funcao] || selected.funcao) : '—';
   $('establishment-role').textContent = selected ? `Sua função: ${role}` : 'Consulte o responsável pelo seu acesso.';
   $('user-role').textContent = role;
-  if (!$('employee-view').hidden) employeeScreen.activate(selected?.id);
+  if (activate && !$('employee-view').hidden) employeeScreen.activate(selected?.id);
 }
 
-async function loadEstablishments() {
+async function loadEstablishments(preferred = requestedContext().unit, activate = true) {
   if (loadingEstablishments || !authenticated) return;
   loadingEstablishments = true;
   const current = generation;
@@ -165,15 +185,19 @@ async function loadEstablishments() {
       option.textContent = item.nome;
       return option;
     }));
+    $('establishment-select').value = authorizedUnit(data, preferred);
     $('selector-wrap').hidden = data.length < 2;
-    selectEstablishment();
+    selectEstablishment(activate);
   } catch (error) {
     if (current !== generation) return;
     if (error.status === 401) { logout(errorMessage(error)); return; }
     establishments = [];
     $('establishment-name').textContent = 'Estabelecimentos indisponíveis';
+    $('establishment-select').replaceChildren();
+    employeeScreen.reset();
     $('data-error-text').textContent = errorMessage(error);
     $('data-error').hidden = false;
+    throw error;
   } finally {
     if (current === generation) { loadingEstablishments = false; $('data-status').hidden = true; }
   }
@@ -198,21 +222,22 @@ $('login-form').addEventListener('submit', async (event) => {
     if (current !== generation) return;
     if (!user || typeof user.id !== 'string' || typeof user.nome !== 'string' || typeof user.email !== 'string') throw new Error('Resposta inválida');
     authenticated = true;
+    identity = user.id; drafts.setIdentity(identity);
     $('password').value = '';
     $('account-name').textContent = $('user-name').textContent = user.nome;
     $('account-email').textContent = $('user-email').textContent = user.email;
     $('avatar').textContent = user.nome.trim().split(/\s+/).slice(0, 2).map((word) => word[0] || '').join('').toLocaleUpperCase('pt-BR');
-    $('login-view').hidden = true;
-    $('app-view').hidden = false;
     // Não restaurar âncoras de uma navegação anterior ao entrar na conta.
     if (window.location.hash) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
-    showPage('dashboard');
+    await loadEstablishments(null, false);
+    if (current !== generation || !authenticated) return;
+    showPage('dashboard', true, 'replace');
+    $('login-view').hidden = true; $('app-view').hidden = false;
     $('sidebar').scrollTop = 0;
-    await loadEstablishments();
   } catch (error) {
-    if (current === generation) showLoginError(errorMessage(error, true));
+    if (current === generation) { if (authenticated) logout(errorMessage(error, true)); else showLoginError(errorMessage(error, true)); }
   } finally {
     $('login-submit').disabled = false;
     $('login-form').removeAttribute('aria-busy');
@@ -268,8 +293,8 @@ $('logout').addEventListener('click', async () => {
     }
   } finally { $('logout').disabled = false; }
 });
-$('retry').addEventListener('click', loadEstablishments);
-$('establishment-select').addEventListener('change', selectEstablishment);
+$('retry').addEventListener('click', () => restoreSession());
+$('establishment-select').addEventListener('change', () => { employeeScreen.reset(); rememberContext('push'); restoreSession(); });
 $('back-dashboard').addEventListener('click', () => openPage('dashboard'));
 $('show-password').addEventListener('click', () => {
   const showing = $('password').type === 'password';
@@ -283,32 +308,48 @@ $('menu-toggle').addEventListener('click', () => {
 });
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && $('menu-toggle').getAttribute('aria-expanded') === 'true') { closeMenu(); $('menu-toggle').focus(); } });
 async function restoreSession() {
+  // Uma requisição por ciclo de revalidação; não criar polling de sessão.
+  if (restoring) { restoreAgain = true; return restoring; }
+  restoring = restoreContext().finally(() => { restoring = null; if (restoreAgain && authenticated) { restoreAgain = false; return restoreSession(); } });
+  return restoring;
+}
+async function restoreContext() {
   const current = ++generation;
+  const previousIdentity = identity;
+  const wanted = requestedContext();
+  loadingEstablishments = false;
   $('app-view').hidden = true;
-  $('login-view').hidden = false;
+  $('login-view').hidden = true;
   $('login-submit').disabled = true;
   $('login-status').textContent = 'Verificando sua sessão…';
   try {
     const user = await getApi('auth/me');
     if (current !== generation) return;
-    if (!user || typeof user.nome !== 'string' || typeof user.email !== 'string') throw new Error('Resposta inválida');
+    if (!user || typeof user.id !== 'string' || typeof user.nome !== 'string' || typeof user.email !== 'string') throw new Error('Resposta inválida');
     authenticated = true;
+    identity = user.id;
+    drafts.setIdentity(identity);
     $('account-name').textContent = $('user-name').textContent = user.nome;
     $('account-email').textContent = $('user-email').textContent = user.email;
-    $('avatar').textContent = user.nome.trim().split(/\s+/).slice(0, 2).map((word) => word[0] || '').join('').toLocaleUpperCase('pt-BR');
-    $('login-view').hidden = true;
-    $('app-view').hidden = false;
-    showPage('dashboard');
-    await loadEstablishments();
+    $('avatar').textContent = user.nome.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toLocaleUpperCase('pt-BR');
+    await loadEstablishments(wanted.unit, false);
+    if (current !== generation || !authenticated) return;
+    const latest = requestedContext();
+    if (latest.page !== wanted.page || latest.unit !== wanted.unit) { restoreAgain = true; return; }
+    const unit = $('establishment-select').value;
+    if (wanted.unit && wanted.unit !== unit) drafts.clearUnit(wanted.unit);
+    const preserve = previousIdentity === identity && employeeScreen.currentUnit() === unit && currentPage === wanted.page && wanted.page === 'funcionarios';
+    if (preserve) { await employeeScreen.revalidate(); rememberContext(); }
+    else showPage(wanted.page, false, 'replace');
+    if (current === generation && authenticated) { $('login-view').hidden = true; $('app-view').hidden = false; }
   } catch (error) {
-    if (current !== generation) return;
-    logout(error.status === 401 ? '' : errorMessage(error));
+    if (current === generation) logout(error.status === 401 ? '' : errorMessage(error));
   } finally {
-    $('login-submit').disabled = false;
-    $('login-status').textContent = '';
+    if (current === generation) { $('login-submit').disabled = false; $('login-status').textContent = ''; }
   }
 }
-
+window.addEventListener('popstate', () => { employeeScreen.reset(); restoreSession(); });
+window.addEventListener('hashchange', () => { if (authenticated) restoreSession(); });
 // Conferir a sessão ao voltar a uma aba, sem polling que prolongue a inatividade.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && authenticated) restoreSession();
