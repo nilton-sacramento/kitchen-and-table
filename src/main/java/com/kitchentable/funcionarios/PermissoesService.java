@@ -93,6 +93,19 @@ public class PermissoesService {
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public List<Catalogo> catalogo(UUID unidade,String email){ator(unidade,email,false);return catalogo();}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
+    public List<Padrao> padroes(UUID unidade,String email){
+        var a=ator(unidade,email,false);
+        exigirExistente(a.vinculo(),"ESTABELECIMENTO_VISUALIZAR");
+        var catalogo=catalogo();
+        List<Padrao> resultado=new ArrayList<>();
+        for(var funcao:List.of("ATENDENTE","CAIXA","COZINHA","BAR","GERENTE")){
+            var codigos=repo.jdbc().queryForList("SELECT p.codigo FROM funcoes_permissoes fp JOIN permissoes p ON p.id=fp.permissao_id JOIN funcoes f ON f.id=fp.funcao_id WHERE f.codigo=?",String.class,funcao);
+            resultado.add(new Padrao(funcao,catalogo.stream().filter(p->codigos.contains(p.codigo())).toList()));
+        }
+        return resultado;
+    }
+
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Capacidades capacidades(UUID unidade,String email){var a=ator(unidade,email,false);return new Capacidades(a.dono(),podeExistente(a.vinculo(),"FUNCIONARIO_FUNCAO_PRINCIPAL_ALTERAR"),a.dono()?List.of():repo.jdbc().queryForList("SELECT alvo_id FROM limites_gestao_alvos WHERE gerente_id=? ORDER BY alvo_id",UUID.class,a.vinculo()));}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public List<FuncionarioDtos.Funcionario> alvos(UUID unidade,String email){

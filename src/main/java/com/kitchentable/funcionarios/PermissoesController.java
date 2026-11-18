@@ -11,6 +11,7 @@ public class PermissoesController {
     private final PermissoesService service;
     public PermissoesController(PermissoesService service){this.service=service;}
     @GetMapping("/catalogo") public List<Catalogo> catalogo(@PathVariable UUID unidade,Authentication a){return service.catalogo(unidade,a.getName());}
+    @GetMapping("/padroes") public List<Padrao> padroes(@PathVariable UUID unidade,Authentication a){return service.padroes(unidade,a.getName());}
     @GetMapping("/capacidades") public Capacidades capacidades(@PathVariable UUID unidade,Authentication a){return service.capacidades(unidade,a.getName());}
     @GetMapping("/minhas") public List<Efetiva> minhas(@PathVariable UUID unidade,Authentication a){return service.minhas(unidade,a.getName());}
     @GetMapping("/alvos") public List<FuncionarioDtos.Funcionario> alvos(@PathVariable UUID unidade,Authentication a){return service.alvos(unidade,a.getName());}

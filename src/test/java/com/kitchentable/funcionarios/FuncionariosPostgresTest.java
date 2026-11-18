@@ -667,4 +667,25 @@ class FuncionariosPostgresTest {
     }
     @Test void principalConcorrenteComAdicionalMantemIntegridadeNoBanco() throws Exception {verificarConcorrenciaDiretaDeFuncoes(true);}
     @Test void adicionalConcorrenteComPrincipalMantemIntegridadeNoBanco() throws Exception {verificarConcorrenciaDiretaDeFuncoes(false);}
+
+    @Test
+    void previaDeFuncaoUsaPadroesDoBancoSemConcederAcessos() throws Exception {
+        int antes=jdbc.queryForObject("SELECT count(*) FROM usuarios_permissoes",Integer.class);
+        var padroes=permissoes.padroes(a,ownerEmail);
+        assertEquals(Set.of("ATENDENTE","CAIXA","COZINHA","BAR","GERENTE"),padroes.stream().map(PermissoesDtos.Padrao::funcao).collect(java.util.stream.Collectors.toSet()));
+        for(var padrao:padroes){
+            var banco=new HashSet<>(jdbc.queryForList("SELECT p.codigo FROM funcoes_permissoes fp JOIN funcoes f ON f.id=fp.funcao_id JOIN permissoes p ON p.id=fp.permissao_id WHERE f.codigo=?",String.class,padrao.funcao()));
+            assertEquals(banco,padrao.permissoes().stream().map(PermissoesDtos.Catalogo::codigo).collect(java.util.stream.Collectors.toSet()));
+        }
+        assertEquals(antes,jdbc.queryForObject("SELECT count(*) FROM usuarios_permissoes",Integer.class));
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/padroes").session(ownerSession)).andExpect(status().isOk());
+    }
+    @Test
+    void previaDeFuncaoExigeSessaoEVinculoNaUnidade() throws Exception {
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/padroes")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/estabelecimentos/"+UUID.randomUUID()+"/permissoes/padroes").session(ownerSession)).andExpect(status().isNotFound());
+        var painel=permissoes.painel(a,managerLink,ownerEmail);
+        permissoes.excecao(a,managerLink,"ESTABELECIMENTO_VISUALIZAR",ownerEmail,new PermissoesDtos.Excecao(PermissoesDtos.Estado.NEGAR,painel.versao()));
+        mvc.perform(get("/api/v1/estabelecimentos/"+a+"/permissoes/padroes").session(managerSession)).andExpect(status().isForbidden());
+    }
 }
