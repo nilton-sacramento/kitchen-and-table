@@ -4,8 +4,14 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   async function security(suffix,method='GET',body){
     return ownerEval(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();const r=await fetch(${JSON.stringify(base+suffix)},{method:${JSON.stringify(method)},headers:{[c.headerName]:c.token,'Content-Type':'application/json'},${body===undefined?'':`body:JSON.stringify(${JSON.stringify(body)}),`}});return {status:r.status,body:await r.json()}})()`);
   }
-  await evaluate("document.querySelector('[data-page=funcionarios]').click();true");
-  await wait("!!document.querySelector('.employee-table')",'equipe para PIN');
+  // O retorno da administracao ja pode restaurar Funcionarios pela URL.
+  // Nao iniciar outra navegacao: a tabela anterior poderia existir enquanto
+  // openPage ainda revalida a sessao e depois descarta o editor recem-aberto.
+  await wait("!document.getElementById('app-view').hidden",'administracao pronta para PIN');
+  if(await evaluate("document.getElementById('employee-view').hidden")){
+    await evaluate("document.querySelector('[data-page=funcionarios]').click();true");
+  }
+  await wait("!document.getElementById('app-view').hidden && !document.getElementById('employee-view').hidden && !!document.querySelector('.employee-table')",'equipe atual para PIN');
   async function openSecurity(name){
     await evaluate(`var row=[...document.querySelectorAll('.employee-table tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}));var trigger=row.querySelector('button[data-focus$=":Segurança operacional"]');trigger.focus();trigger.click();true`);
     await wait("!!document.getElementById('security-pin')",'editor de PIN');
