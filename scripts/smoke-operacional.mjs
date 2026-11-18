@@ -87,11 +87,19 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   await evaluate("[...document.querySelectorAll('#op-protected button')].find(b=>b.textContent==='Trocar operador').click();true");await locked();
   await wait("!document.getElementById('op-enter').disabled",'troca de operador pronta');if(!await evaluate("document.getElementById('op-person').value===''"))throw new Error('Troca manteve identidade anterior');await login(fixture.managerVinculo,credential.secondPin);await unlocked('ZZZ Gerente de teste');
   if(await evaluate("(async()=>(await fetch('/api/v1/estabelecimentos')).status)()")!==403)throw new Error('PIN de gerente elevou autenticacao administrativa');
+  // Observar um polling real concluido antes de rotacionar a sessao. Uma consulta
+  // em voo com o principal anterior pode receber sessao revogada e bloquear com
+  // mensagem generica valida, sem exercitar o ramo especifico "outra aba".
+  // Nao suprimir polling, simular respostas ou alterar a protecao da aplicacao.
+  const polled=await evaluate("(async()=>{const original=window.fetch;let timeout;try{return await new Promise((resolve,reject)=>{timeout=setTimeout(()=>reject(Error('Polling real nao observado')),12000);window.fetch=async(...args)=>{const response=await original(...args);if(new URL(String(args[0]),location.href).pathname==='/api/v1/operacional/sessao'){window.fetch=original;resolve(response.status);}return response;};});}finally{clearTimeout(timeout);window.fetch=original;}})()");
+  if(polled!==200)throw new Error('Sessao nao foi revalidada antes da troca');
   // Outra aba usa o mesmo cookie; a aba anterior nao deve adotar o novo operador sem PIN.
   const swapped=await evaluate(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();return(await fetch('/api/v1/operacional/entrar',{method:'POST',headers:{[c.headerName]:c.token,'Content-Type':'application/json'},body:JSON.stringify({estabelecimentoId:${JSON.stringify(fixture.estabelecimentoId)},identificacao:${JSON.stringify(targetLink)},pin:${JSON.stringify(credential.pin)}})})).status})()`);
   if(swapped!==204)throw new Error('Simulacao de troca em outra aba rejeitada');
   await locked();if(!await evaluate("document.getElementById('op-state').textContent.includes('outra aba')"))throw new Error('Troca em outra aba nao exigiu identificacao');
+  if(!await evaluate("document.getElementById('op-pin').value==='' && sessionStorage.getItem('kt.operational.locked')==='1'"))throw new Error('Troca nao exigiu PIN com bloqueio local persistente');
   await login(fixture.managerVinculo,credential.secondPin);await unlocked('ZZZ Gerente de teste');
+  if(!await evaluate("document.getElementById('op-pin').value==='' && sessionStorage.getItem('kt.operational.locked')===null"))throw new Error('Nova identificacao nao limpou PIN ou bloqueio local');
   pass('PIN: mudanca de operador em outra aba nao substitui identidade exibida');
   const events=await security('/eventos');if(!events.body.some(e=>e.tipo==='OPERACIONAL_TROCA_OPERADOR')||!events.body.some(e=>e.tipo==='OPERACIONAL_TENTATIVAS_BLOQUEADO'))throw new Error('Auditoria operacional incompleta');
   // Ordem deterministica: logout deve aguardar o login em voo e invalidar a sessao resultante.
