@@ -1,5 +1,6 @@
 // Interface real de permissoes; autorizacao definitiva permanece no servidor.
 const operational = ['ATENDENTE', 'CAIXA', 'COZINHA', 'BAR'];
+const roleNames = { ATENDENTE:'Atendente', CAIXA:'Caixa', COZINHA:'Cozinha', BAR:'Bar', GERENTE:'Gerente' };
 const node = (tag, text = '', cls = '') => { const n = document.createElement(tag); n.textContent = text; n.className = cls; return n; };
 function check(parent, label, checked = false) {
   const l = node('label', '', 'employee-check'); const i = document.createElement('input'); i.type = 'checkbox'; i.checked = checked;
@@ -11,9 +12,10 @@ export function createPermissionsEditor({ call, editor, finishForm, run, fail, g
     try {
       const panel = await call(`/funcionarios/${row.vinculoId}`); if (current !== generation()) return;
       const form = editor(`Funções e permissões: ${panel.nome}`); form.classList.add('permission-form');
-      form.append(node('p', `Função principal: ${panel.principal}. Vínculo nesta unidade: ${panel.vinculoId}`, 'muted small'));
+      form.append(node('p', `Função principal: ${roleNames[panel.principal] || panel.principal}.`, 'muted small'));
+      const identifiers = node('details', '', 'employee-identifiers'); identifiers.append(node('summary', 'Identificador do vínculo'), node('code', panel.vinculoId)); form.append(identifiers);
       const additional = node('fieldset'); additional.append(node('legend', 'Funções adicionais operacionais'));
-      const fields = operational.filter(c => c !== panel.principal).map(c => [c, check(additional, c, panel.adicionais.includes(c))]);
+      const fields = operational.filter(c => c !== panel.principal).map(c => { const field = check(additional, roleNames[c], panel.adicionais.includes(c)); field.dataset.role = c; return [c, field]; });
       additional.disabled = !panel.alterarAdicionais;
       const saveRoles = node('button', 'Salvar funções adicionais', 'secondary'); saveRoles.type = 'button'; saveRoles.disabled = !panel.alterarAdicionais;
       saveRoles.dataset.permissionDisabled = String(!panel.alterarAdicionais);
@@ -21,15 +23,32 @@ export function createPermissionsEditor({ call, editor, finishForm, run, fail, g
       additional.append(saveRoles); form.append(additional);
       form.append(node('p', 'Herdar segue as funções; permitir concede explicitamente; negar prevalece sobre heranças. Contratos futuros não habilitam operações. A autoridade administrativa continua sujeita à hierarquia e às delegações.', 'muted small'));
       const search = document.createElement('input'); search.type = 'search'; search.placeholder = 'Filtrar permissões'; search.setAttribute('aria-label', 'Filtrar permissões'); form.append(search);
+      const totals = node('p', '', 'permission-overview'); totals.setAttribute('role', 'status');
+      const effective = panel.permissoes.filter(i => i.efetiva).length;
+      const future = panel.permissoes.filter(i => !i.permissao.disponivel).length;
+      totals.textContent = effective + (effective === 1 ? ' permissão efetiva nesta unidade. ' : ' permissões efetivas nesta unidade. ') + future + (future === 1 ? ' contrato futuro não habilita operações.' : ' contratos futuros não habilitam operações.');
+      form.append(totals);
+      const filter = document.createElement('select'); filter.setAttribute('aria-label', 'Mostrar permissões'); filter.id = 'permission-view-filter'; const filterLabel = node('label', 'Mostrar permissões'); filterLabel.htmlFor = filter.id; form.append(filterLabel);
+      for (const [value, text] of [['todas','Todas'],['efetivas','Acesso permitido'],['negadas','Acesso não permitido'],['individuais','Exceções individuais'],['criticas','Críticas'],['futuras','Contratos futuros']]) { const o = node('option', text); o.value = value; filter.append(o); }
+      form.append(filter);
+      const visibleStatus = node('p', '', 'muted small'); visibleStatus.setAttribute('role', 'status'); form.append(visibleStatus);
       const groups = node('div', '', 'permission-groups'); form.append(groups);
       for (const category of ['ADMINISTRATIVA', 'OPERACIONAL', 'FINANCEIRA']) {
-        const section = node('section', '', 'permission-group'); section.append(node('h4', category));
+        const categoryBox = node('section', '', 'permission-category'); categoryBox.append(node('h4', { ADMINISTRATIVA:'Administração', OPERACIONAL:'Operação', FINANCEIRA:'Financeiro' }[category]));
+        const modules = new Map();
+        function sectionFor(p) {
+          if (modules.has(p.modulo)) return modules.get(p.modulo);
+          const box = node('details', '', 'permission-module'); box.open = panel.permissoes.some(i => i.permissao.modulo === p.modulo && i.permissao.disponivel);
+          const names = { FUNCIONARIOS:'Funcionários', ESTABELECIMENTOS:'Estabelecimentos', SEGURANCA:'Segurança operacional', FUNCOES:'Funções', PERMISSOES:'Permissões', PRODUTOS:'Produtos', CAIXA:'Caixa', FINANCEIRO:'Financeiro', PEDIDOS:'Pedidos', ESTOQUE:'Estoque', MESAS:'Mesas', COMANDAS:'Comandas', COZINHA:'Cozinha', BAR:'Bar' };
+          box.append(node('summary', names[p.modulo] || p.modulo));
+          const body = node('div', '', 'permission-group'); box.append(body); categoryBox.append(box); modules.set(p.modulo, body); return body;
+        }
         for (const item of panel.permissoes.filter(i => i.permissao.categoria === category)) {
-          const p = item.permissao; const card = node('article', '', 'permission-card'); card.dataset.code = p.codigo; card.dataset.filter = `${p.nome} ${p.codigo}`.toLocaleLowerCase('pt-BR');
+          const p = item.permissao; const section = sectionFor(p); const card = node('article', '', 'permission-card'); card.dataset.code = p.codigo; card.dataset.filter = `${p.nome} ${p.codigo} ${p.modulo} ${p.descricao} ${item.estado}`.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR'); card.dataset.effective = String(item.efetiva); card.dataset.individual = String(item.estado !== 'HERDAR'); card.dataset.critical = String(p.critica); card.dataset.future = String(!p.disponivel);
           card.append(node('strong', p.nome), node('small', `${p.modulo}${p.critica ? ' · Crítica' : ''}${p.disponivel ? '' : ' · Contrato futuro/legado inativo'}`, 'muted'));
           const detail = node('details'); detail.append(node('summary', 'Código técnico'), node('code', p.codigo)); card.append(detail);
           card.append(node('p', p.descricao), node('p', `Origem: ${item.herdadaDe.join(', ') || 'Sem padrão herdado'}`, 'muted small'));
-          card.append(node('p', `Estado individual: ${item.estado}. Resultado configurado: ${item.configurada ? 'permitido' : 'negado'}. Acesso efetivo: ${item.efetiva ? 'permitido' : 'negado'}.`, 'permission-result'));
+          card.append(node('p', `${ {HERDAR:'Padrão herdado das funções',PERMITIR:'Concessão individual',NEGAR:'Negação individual'}[item.estado] }. Configuração: ${item.configurada ? 'permitida' : 'negada'}. Agora: ${item.efetiva ? 'pode usar' : 'não pode usar'}.`, 'permission-result'));
           if (item.restricao) card.append(node('p', item.restricao, 'muted small'));
           const label = node('label', `Exceção: ${p.nome}`); const select = document.createElement('select'); select.id = `permission-${p.codigo}`; label.htmlFor = select.id;
           const grant = panel.conceder.includes(p.codigo), revoke = panel.revogar.includes(p.codigo);
@@ -47,13 +66,24 @@ export function createPermissionsEditor({ call, editor, finishForm, run, fail, g
           select.addEventListener('change', updateAction); updateAction();
           if (grant !== revoke) card.append(node('p', `Você pode apenas ${grant ? 'permitir' : 'negar'} esta capacidade. Voltar a Herdar exige autorização para conceder e revogar.`, 'muted small'));
           save.addEventListener('click', () => {
-            if (confirm(`Confirmar ${select.value} para ${p.nome}, somente nesta unidade?`)) run(() => call(`/funcionarios/${row.vinculoId}/individuais/${encodeURIComponent(p.codigo)}`, 'PUT', { estado: select.value, versao: panel.versao }), 'Permissão atualizada. Abra novamente para consultar o resultado.');
+            if (confirm(`Confirmar ${ {HERDAR:'seguir os padrões das funções',PERMITIR:'conceder individualmente',NEGAR:'negar individualmente'}[select.value] } para ${p.nome}, somente nesta unidade?${p.critica ? ' Esta permissão é crítica.' : ''}`)) run(() => call(`/funcionarios/${row.vinculoId}/individuais/${encodeURIComponent(p.codigo)}`, 'PUT', { estado: select.value, versao: panel.versao }), 'Permissão atualizada. Abra novamente para consultar o resultado.');
           });
           card.append(label, select, save); section.append(card);
         }
-        groups.append(section);
+        if (modules.size) groups.append(categoryBox);
       }
-      search.addEventListener('input', () => { const term = search.value.toLocaleLowerCase('pt-BR'); groups.querySelectorAll('.permission-card').forEach(c => { c.hidden = !c.dataset.filter.includes(term); }); });
+      function applyFilter() {
+        const term = search.value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');
+        for (const card of groups.querySelectorAll('.permission-card')) {
+          const kind = filter.value;
+          const match = kind === 'todas' || kind === 'efetivas' && card.dataset.effective === 'true' || kind === 'negadas' && card.dataset.effective === 'false' || kind === 'individuais' && card.dataset.individual === 'true' || kind === 'criticas' && card.dataset.critical === 'true' || kind === 'futuras' && card.dataset.future === 'true';
+          card.hidden = !match || !card.dataset.filter.includes(term);
+        }
+        const visible = [...groups.querySelectorAll('.permission-card')].filter(card => !card.hidden).length; visibleStatus.textContent = visible ? visible + ' permissões correspondem ao filtro.' : 'Nenhuma permissão corresponde ao filtro.';
+        for (const box of groups.querySelectorAll('.permission-module')) { box.hidden = ![...box.querySelectorAll('.permission-card')].some(c => !c.hidden); if ((term || filter.value !== 'todas') && !box.hidden) box.open = true; }
+        for (const category of groups.querySelectorAll('.permission-category')) category.hidden = ![...category.querySelectorAll('.permission-module')].some(m => !m.hidden);
+      }
+      search.addEventListener('input', applyFilter); filter.addEventListener('change', applyFilter); applyFilter();
       finishForm(form, () => {}); form.querySelector('button[type=submit]').remove();
     } catch (e) { if (current === generation()) { if (e.status === 403) await refresh().catch(() => {}); fail(e); } }
   }

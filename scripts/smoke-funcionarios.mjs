@@ -112,7 +112,7 @@ try {
   await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Ativar').click();true");
   await wait("document.querySelector('.employee-table tbody tr')?.children[3]?.textContent==='Ativo'", 'reativação');
   pass('ativação e desativação integradas');
-  await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Função').click();document.getElementById('employee-funcao').value='GERENTE';document.querySelector('.employee-form').requestSubmit();true");
+  await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Função principal').click();document.getElementById('employee-funcao').value='GERENTE';document.querySelector('.employee-form').requestSubmit();true");
   await wait("document.querySelector('.employee-table tbody tr')?.children[1]?.textContent==='Gerente'", 'promoção pelo proprietário');
   await evaluate("[...document.querySelectorAll('.employee-table tbody button')].find(b=>b.textContent==='Limites do gerente').click();true");
   await wait("document.querySelectorAll('.employee-form input[type=checkbox]').length===10", 'limites administrativos');
@@ -153,7 +153,7 @@ try {
       await press('Escape', 'Escape', 27);
       if (!(await evaluate("document.querySelector('[data-editor]').hidden && document.activeElement?.textContent==='Editar'"))) throw new Error('Escape nao devolveu foco.');
       await press('Tab', 'Tab', 9);
-      if (!(await evaluate("document.activeElement?.textContent==='Função'"))) throw new Error('Ordem de Tab incorreta.');
+      if (!(await evaluate("document.activeElement?.textContent==='Função principal'"))) throw new Error('Ordem de Tab incorreta.');
       await evaluate("document.getElementById('menu-toggle').focus();true");
       await press('Enter', 'Enter', 13);
       if (!(await evaluate("document.getElementById('menu-toggle').getAttribute('aria-expanded')==='true'"))) throw new Error('Menu mobile nao abriu pelo teclado.');
@@ -179,7 +179,7 @@ try {
     await wait("!!document.querySelector('.permission-card')", 'painel real de permissoes');
   }
   await permissionPanel();
-  await evaluate("const field=[...document.querySelectorAll('.permission-form fieldset label')].find(l=>l.textContent==='BAR').querySelector('input');field.checked=true;[...document.querySelectorAll('.permission-form button')].find(b=>b.textContent==='Salvar funções adicionais').click();true");
+  await evaluate("const field=document.querySelector('.permission-form input[data-role=BAR]');field.checked=true;[...document.querySelectorAll('.permission-form button')].find(b=>b.textContent==='Salvar funções adicionais').click();true");
   await wait("document.querySelector('[data-message]')?.textContent.startsWith('Funções adicionais atualizadas.')", 'funcoes adicionais');
   await permissionPanel();
   if (!(await evaluate("document.querySelector('[data-code=PRODUTO_CONSULTAR]').textContent.includes('BAR')"))) throw new Error('Heranca de adicional nao exibida.');

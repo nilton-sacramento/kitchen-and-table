@@ -4,7 +4,7 @@ const roles = { ATENDENTE: 'Atendente', CAIXA: 'Caixa', COZINHA: 'Cozinha', BAR:
 const common = ['ATENDENTE', 'CAIXA', 'COZINHA', 'BAR'];
 const uuidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const el = (tag, text = '', className = '') => { const node = document.createElement(tag); node.textContent = text; node.className = className; return node; };
-export function createEmployeeScreen({ root, api, onExpired, getEstablishments = () => [] }) {
+export function createEmployeeScreen({ root, api, onExpired, getEstablishments = () => [], drafts }) {
   let unit = null, generation = 0, capabilities = null, rows = [], requests = [], busy = false, permissionCapabilities = { proprietario: false, alvos: [] };
   function reset() { generation++; unit = null; rows = []; requests = []; capabilities = null; busy = false; editorTrigger = null; root.removeAttribute('aria-busy'); root.replaceChildren(); }
   function path(suffix = '') { return `estabelecimentos/${encodeURIComponent(unit)}/funcionarios${suffix}`; }
@@ -83,10 +83,42 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
   }
   function finishForm(form, action) {
     const controls = el('div', '', 'employee-actions'); const submit = el('button', 'Salvar', 'primary'); submit.type = 'submit';
-    controls.append(submit, button('Cancelar', () => { const slot = root.querySelector('[data-editor]'); slot.replaceChildren(); slot.hidden = true; restoreFocus(editorTrigger); editorTrigger = null; })); form.append(controls);
+    controls.append(submit, button('Cancelar', () => { form.discardDraft?.(); const slot = root.querySelector('[data-editor]'); slot.replaceChildren(); slot.hidden = true; restoreFocus(editorTrigger); editorTrigger = null; })); form.append(controls);
     form.addEventListener('submit', (event) => { event.preventDefault(); if (form.reportValidity()) action(); });
     form.querySelector('input:not(:disabled),select:not(:disabled),button')?.focus();
     form.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); controls.querySelector('button[type=button]').click(); } });
+  }
+  function attachDraft(form, row, fields) {
+    if (!drafts) return;
+    const scope = unit, record = row?.vinculoId || null, version = row?.versao ?? null;
+    const saved = drafts.read(scope, record, version);
+    const note = el('p', saved ? 'Rascunho restaurado. Confira os dados antes de salvar.' : '', 'draft-status');
+    note.setAttribute('role', 'status');
+    for (const [name, field] of Object.entries(fields)) if (saved && typeof saved[name] === 'string') {
+      if (field.tagName !== 'SELECT' || [...field.options].some(o => o.value === saved[name] && !o.disabled)) field.value = saved[name];
+    }
+    const discard = button('Descartar rascunho', () => { drafts.discard(scope, record); edit(row); });
+    discard.hidden = !saved;
+    form.prepend(note); form.append(discard);
+    form.discardDraft = () => drafts.discard(scope, record);
+    form.addEventListener('input', () => {
+      if (scope !== unit) return;
+      drafts.save(scope, record, version, Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, field.value])));
+      note.textContent = 'Alterações não salvas — rascunho local por até 30 minutos.'; discard.hidden = false;
+    });
+  }
+  function restoreEligibleDraft() {
+    if (!drafts) return;
+    for (const record of drafts.pending(unit)) {
+      if (record === 'nova') {
+        if (capabilities.cadastrar && capabilities.funcoes.length && drafts.read(unit, null, null)) { edit(); return; }
+        if (!capabilities.cadastrar) drafts.discard(unit, null);
+      } else {
+        const row = rows.find(r => r.vinculoId === record);
+        if (row && capabilities.editar && (capabilities.proprietario || capabilities.funcoes.includes(row.funcao)) && drafts.read(unit, record, row.versao)) { edit(row); return; }
+        if (!row || !capabilities.editar || !(capabilities.proprietario || capabilities.funcoes.includes(row.funcao))) drafts.discard(unit, record);
+      }
+    }
   }
   function edit(row = null) {
     const form = editor(row ? 'Editar dados nesta unidade' : 'Cadastrar nova pessoa');
@@ -94,15 +126,34 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     const email = input(form, 'email', 'E-mail de contato (opcional; não cria login)', row?.emailContato, { type: 'email', maxLength: 255 });
     const phone = input(form, 'telefone', 'Telefone (opcional)', row?.telefone, { type: 'tel', maxLength: 32 });
     const role = row ? null : select(form, 'funcao', 'Função principal', capabilities.funcoes);
+    if (role) rolePreview(form, role);
     if (!row) form.append(el('p', 'Se esta pessoa já tem identidade no sistema, utilize a associação autorizada entre unidades. Nome ou contato não associam contas automaticamente.', 'muted small'));
     const key = crypto.randomUUID();
+    const draftScope = unit;
+    attachDraft(form, row, { nome: name, emailContato: email, telefone: phone, ...(role ? { funcao: role } : {}) });
     finishForm(form, () => run(() => request(row ? `/${row.vinculoId}` : '', row ? 'PATCH' : 'POST', {
       nome: name.value.trim(), emailContato: email.value.trim() || null, telefone: phone.value.trim() || null,
       ...(row ? { versao: row.versao } : { funcao: role.value }),
-    }, row ? null : key), row ? 'Dados locais atualizados.' : 'Funcionário cadastrado. Defina um PIN em Segurança operacional para liberar o acesso.'));
+    }, row ? null : key).then(result => { drafts?.discard(draftScope, row?.vinculoId); return result; }), row ? 'Dados locais atualizados.' : 'Funcionário cadastrado. Defina um PIN em Segurança operacional para liberar o acesso.'));
+  }
+  function rolePreview(form, select, row = null) {
+    const current = generation;
+    const preview = el('section', '', 'role-preview'); preview.setAttribute('aria-label', 'Prévia da função');
+    const title = el('h4', 'Padrões da função — prévia'); const status = el('p', 'Consultando padrões do servidor…', 'muted small'); const list = el('ul');
+    preview.append(title, status, list); form.append(preview);
+    permissionCall('/padroes').then(data => {
+      if (current !== generation || !form.isConnected) return;
+      const update = () => {
+        const pattern = data.find(p => p.funcao === select.value); list.replaceChildren();
+        status.textContent = row ? 'Prévia dos padrões herdados. Exceções individuais e negações existentes serão preservadas; não é uma concessão nem o acesso efetivo.' : 'Padrões herdados da função. Não concede autoridade administrativa nem executa contratos futuros.';
+        for (const p of pattern?.permissoes || []) list.append(el('li', p.nome + (p.critica ? ' — crítica; sujeita à autorização' : '') + (!p.disponivel ? ' — módulo futuro indisponível' : '')));
+        if (!list.children.length) list.append(el('li', 'Nenhuma permissão padrão cadastrada para esta função.'));
+      };
+      select.addEventListener('change', update); update();
+    }).catch(error => { if (current === generation) { status.textContent = 'Não foi possível consultar a prévia. Nenhuma permissão foi alterada.'; if (error.status === 401) fail(error); } });
   }
   function changeRole(row) {
-    const form = editor('Alterar função principal'); const role = select(form, 'funcao', 'Função nesta unidade', capabilities.funcoes, row.funcao);
+    const form = editor('Alterar função principal'); const role = select(form, 'funcao', 'Função nesta unidade', capabilities.funcoes, row.funcao); rolePreview(form, role, row);
     form.append(el('p', 'Criar ou promover gerente exige proprietário. Uma mudança de função remove delegações administrativas antigas.', 'muted small'));
     finishForm(form, () => run(() => request(`/${row.vinculoId}/funcao-principal`, 'PATCH', { funcao: role.value, versao: row.versao }), 'Função atualizada.'));
   }
@@ -175,7 +226,7 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
           const manageRow = capabilities.proprietario || capabilities.funcoes.includes(row.funcao);
           if (capabilities.editar && manageRow) {
             controls.append(button('Editar', () => edit(row)));
-            if (permissionCapabilities.alterarPrincipal) controls.append(button('Função', () => changeRole(row)));
+            if (permissionCapabilities.alterarPrincipal) controls.append(button('Função principal', () => changeRole(row)));
           }
           if (manageRow && ((row.ativo && capabilities.desativar) || (!row.ativo && capabilities.ativar))) controls.append(button(row.ativo ? 'Desativar' : 'Ativar', () => {
             if (window.confirm(`${row.ativo ? 'Desativar' : 'Ativar'} o vínculo de ${row.nome} nesta unidade? O histórico e as outras unidades serão preservados.`)) run(() => request(`/${row.vinculoId}/situacao`, 'PATCH', { ativo: !row.ativo, versao: row.versao }), 'Situação do vínculo atualizada.');
@@ -205,7 +256,7 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
       root.append(section);
     }
   }
-  async function load(current) {
+  async function load(current, preserveEditor = false) {
     const c = await request('/capacidades'); if (current !== generation) return;
     const pc = await permissionCall('/capacidades'); if (current !== generation) return;
     const sc = await securityCall('/capacidades'); if (current !== generation) return;
@@ -213,7 +264,9 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     const employees = [...new Map([...legacy, ...delegated].map(row => [row.vinculoId, row])).values()];
     if (current !== generation) return;
     if (!Array.isArray(employees) || !Array.isArray(incoming) || !Array.isArray(c.funcoes)) throw new Error('Resposta inválida');
-    capabilities = c; permissionCapabilities = pc; securityCapabilities = sc; rows = employees; requests = incoming; render();
+    const unchanged = preserveEditor && JSON.stringify([capabilities, permissionCapabilities, securityCapabilities, rows, requests]) === JSON.stringify([c, pc, sc, employees, incoming]);
+    capabilities = c; permissionCapabilities = pc; securityCapabilities = sc; rows = employees; requests = incoming;
+    if (!unchanged) { render(); restoreEligibleDraft(); }
   }
   async function activate(id) {
     reset(); unit = id || null; const current = generation;
@@ -223,8 +276,14 @@ export function createEmployeeScreen({ root, api, onExpired, getEstablishments =
     catch (error) {
       if (current !== generation) return;
       if (error.status === 401) { reset(); onExpired(); return; }
+      if (error.status === 403) drafts?.clearUnit(unit);
       root.replaceChildren(); const msg = el('p'); msg.dataset.message = ''; msg.setAttribute('role', 'alert'); root.append(msg); fail(error); root.append(button('Tentar novamente', () => activate(unit)));
     }
   }
-  return { activate, reset };
+  async function revalidate() {
+    const current = generation;
+    try { await load(current, true); }
+    catch (error) { if (current !== generation) return; if (error.status === 403) drafts?.clearUnit(unit); reset(); const note = el('p'); note.dataset.message = ''; note.setAttribute('role', 'alert'); root.append(note); fail(error); }
+  }
+  return { activate, reset, revalidate, currentUnit: () => unit };
 }

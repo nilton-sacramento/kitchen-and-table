@@ -279,4 +279,15 @@ html{scroll-behavior:smooth}
 .operational-shell button{min-height:44px;margin-top:12px}
 .operational-shell #op-protected button{margin-right:12px}
 .operational-shell .intro-link{display:block;margin-top:24px}
-@media(max-width:600px){.operational-shell{padding:22px 16px}.operational-shell h1{font-size:26px}.operational-body{padding:16px 12px}}
+@media(max-width:600px){.operational-shell{padding:22px 16px}.operational-shell h1{font-size:26px}.operational-body{padding:16px 12px}}/* Contexto, rascunhos e organização de permissões. */
+.draft-status:empty{display:none}
+.draft-status,.permission-overview{padding:12px;background:#f1f4ed;border-radius:6px;font-size:13px;line-height:1.6}
+.permission-category{display:grid;gap:12px;min-width:0}
+.permission-category>h4{font-size:16px;margin:8px 0}
+.permission-module{border:1px solid var(--line);border-radius:8px;min-width:0}
+.permission-module>summary{padding:14px;cursor:pointer;min-height:44px;font-weight:600}
+.permission-module>.permission-group{padding:12px}
+.permission-module[hidden],.permission-category[hidden]{display:none}
+.role-preview{border:1px solid var(--line);border-radius:8px;padding:14px;overflow-wrap:anywhere}
+.role-preview h4{margin:0 0 10px}.role-preview ul{margin:8px 0;padding-left:20px;font-size:13px;line-height:1.8}
+@media(max-width:600px){.permission-module>.permission-group{padding:8px}.role-preview{padding:10px}}

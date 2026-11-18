@@ -46,6 +46,7 @@ class WebAccessTest {
         mvc.perform(get("/index.html")).andExpect(status().isOk())
             .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"login-form\"")));
         mvc.perform(get("/assets/app.js")).andExpect(status().isOk());
+        mvc.perform(get("/assets/interface-contexto.js")).andExpect(status().isOk());
         mvc.perform(get("/assets/app.css")).andExpect(status().isOk());
     }
 
