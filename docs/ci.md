@@ -18,7 +18,7 @@ Token contents: read; checkout sem persistir credenciais; sem secrets, pull_requ
 
 ## Histórico da transição
 
-O PR #2 foi integrado em develop por autorização, no merge commit 30f788a661e3c72017b1099b62d23cf04c2e95ea. Seu CI passou ainda com o bootstrap, necessário porque aquela branch não tinha backend. Depois, develop foi incorporada na feature com merge commit e o template definitivo foi ativado no próprio PR #1. Posteriormente, o PR #1 foi integrado na develop em bb34935, e o PR #3 da Entrega 2.1 em 2c4108a, com CI aprovado. A Entrega 2.2 foi integrada pelo PR #4 em develop no commit 35f1568. A Entrega 2.3 permanece em revisão no PR #5.
+O PR #2 foi integrado em develop por autorização, no merge commit 30f788a661e3c72017b1099b62d23cf04c2e95ea. Seu CI passou ainda com o bootstrap, necessário porque aquela branch não tinha backend. Depois, develop foi incorporada na feature com merge commit e o template definitivo foi ativado no próprio PR #1. Posteriormente, o PR #1 foi integrado na develop em bb34935, e o PR #3 da Entrega 2.1 em 2c4108a, com CI aprovado. A Entrega 2.2 foi integrada pelo PR #4 em develop no commit 35f1568. A Entrega 2.3 foi integrada pelo PR #5 em develop no commit 2c3322e76d626f83a898d00338cdd4cde46abac0. A Entrega 2.4 segue o fluxo de publicação em feature e PR Draft; o resultado remoto precisa ser confirmado no HEAD publicado.
 
 O arquivo .github/ci-templates/ci-sem-bootstrap.yml permanece como referência da transição, fora dos workflows ativos. O workflow atual já é a versão sem bootstrap. Os registros anteriores de execuções em bootstrap são evidências históricas, não o comportamento atual desta branch.
 

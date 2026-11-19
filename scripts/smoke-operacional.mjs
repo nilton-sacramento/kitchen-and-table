@@ -1,3 +1,4 @@
+import { prepararMesas, smokeMesasComandas } from './smoke-mesas-comandas.mjs';
 // Extensao do smoke principal: API real, Chrome e PostgreSQL 16 descartavel.
 export async function smokeOperational({fixture,targetLink,credential,cdp,evaluate,wait,press,pause,pass,ownerEval,artifacts,fs,path}) {
   const base=`/api/v1/estabelecimentos/${fixture.estabelecimentoId}/seguranca-operacional`;
@@ -8,6 +9,7 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   // Nao iniciar outra navegacao: a tabela anterior poderia existir enquanto
   // openPage ainda revalida a sessao e depois descarta o editor recem-aberto.
   await wait("!document.getElementById('app-view').hidden",'administracao pronta para PIN');
+  await prepararMesas({fixture,targetLink,evaluate,wait,ownerEval,pass});
   if(await evaluate("document.getElementById('employee-view').hidden")){
     await evaluate("document.querySelector('[data-page=funcionarios]').click();true");
   }
@@ -51,6 +53,7 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
     const shot=await cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await fs.writeFile(path.join(artifacts,`operacional-bloqueado-${label}.png`),Buffer.from(shot.data,'base64'));
   }
   await login(targetLink,credential.pin);await unlocked('Funcionario permissoes');
+  await smokeMesasComandas({fixture,targetLink,credential,login,cdp,evaluate,wait,pass,pause,artifacts,fs,path});
   for(const [label,width,height] of [['desktop',1366,900],['tablet',768,1024],['mobile',360,800]]){
     await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<500});await pause(100);
     if(!await evaluate('document.documentElement.scrollWidth<=innerWidth+2'))throw new Error(`Operacional transborda em ${label}`);

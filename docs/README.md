@@ -20,6 +20,7 @@
 - [Entrega 2.2 — funções e permissões](entrega-2-2.md)
 - [Revisão final da Entrega 2.2](revisao-final-entrega-2-2.md)
 - [Entrega 2.3 — PIN e segurança operacional](entrega-2-3.md)
+- [Entrega 2.4 — mesas e comandas, contratos e limites](entrega-2-4.md)
 - [Contexto, rascunhos e permissões — implementação local, validação e limites](interface-contexto-permissoes.md)
 - [Planejamento anterior das correções](planejamento-correcoes-interface.md)
 

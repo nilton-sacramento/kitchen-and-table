@@ -33,3 +33,11 @@ O frontend é servido pelo Spring Boot e não requer um processo Node em execuç
 `node --test scripts/test-interface-contexto.mjs`: testes puros de contexto/drafts.
 
 `node scripts/test-interface-browser.mjs`: Chrome real com API controlada de teste, sem PostgreSQL. Evidências e perfil exclusivo permanecem ignorados em .tools/missao-2026-11-18; não são apagados automaticamente. Esse teste não valida o backend nem altera aprovações manuais.
+
+## Entrega 2.4
+
+O smoke oficial importa smoke-mesas-comandas.mjs, com administração de mesas, duas unidades, atendimento por PIN, abertura idempotente, F5, encerramento operacional, cancelamento justificado e capturas desktop/tablet/360px. Não executar a extensão sozinha.
+
+Testes puros adicionais: node --test scripts/test-atendimento.mjs. O comando conjunto é node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs. Backend e migrações: MesasComandasPostgresTest em src/test/java/com/kitchentable/comandas, executado pelo mvn verify com PostgreSQL 16 descartável.
+
+Ambiente navegável exclusivamente descartável: após mvn verify, execute node scripts/ambiente-atendimento.mjs. URL aleatória em loopback e arquivo privado de credenciais são informados no terminal. Ctrl+C encerra a fixture criada pelo script. Não usar para migrar o cenário manual anterior.

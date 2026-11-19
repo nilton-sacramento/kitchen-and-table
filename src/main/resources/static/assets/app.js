@@ -1,3 +1,4 @@
+import { createMesaScreen } from './mesas.js';
 import { readNavigation, authorizedUnit, navigationHash, createDraftStore } from './interface-contexto.js';
 import { createEmployeeScreen } from './funcionarios.js';
 const $ = (id) => document.getElementById(id);
@@ -32,6 +33,8 @@ let establishments = [];
 let generation = 0;
 let loadingEstablishments = false;
 const employeeScreen = createEmployeeScreen({ root: $('employee-view'), api: getApi, getEstablishments: () => establishments, drafts, onExpired: () => logout('Sua sessão expirou. Entre novamente.') });
+
+const mesaScreen = createMesaScreen({ root: $('mesas-view'), api: getApi, onExpired: () => logout('Sua sessão expirou. Entre novamente.') });
 
 class ApiError extends Error {
   constructor(status, detail) { super('Falha na requisição'); this.status = status; this.detail = detail; }
@@ -79,7 +82,7 @@ function showLoginError(message) {
 
 function logout(message = '', notify = true) {
   if (notify) authEvents?.postMessage({ type: 'logout' });
-  employeeScreen.reset();
+  employeeScreen.reset(); mesaScreen.reset();
   drafts.clear(); identity = null; restoreAgain = false;
   history.replaceState(null, '', location.pathname + location.search);
   generation++;
@@ -115,18 +118,23 @@ function showPage(id, focus = true, historyMode = 'push') {
   const module = modules.find((item) => item[0] === id);
   const dashboard = !module;
   const employees = id === 'funcionarios';
+  const mesas = id === 'mesas';
+  $('mesas-view').hidden = !mesas;
+  if (mesas) mesaScreen.activate($('establishment-select').value); else mesaScreen.reset();
   $('employee-view').hidden = !employees;
   if (employees) employeeScreen.activate($('establishment-select').value);
   else employeeScreen.reset();
   $('dashboard').hidden = !dashboard;
-  $('module-view').hidden = dashboard || employees;
+  $('module-view').hidden = dashboard || employees || mesas;
   $('page-title').textContent = dashboard ? 'Visão geral' : module[1];
   $('breadcrumb').textContent = dashboard ? 'VISÃO GERAL' : module[1].toLocaleUpperCase('pt-BR');
   $('page-description').textContent = dashboard ? 'Seu estabelecimento, no centro da gestão.' : employees ? 'Cadastros e vínculos independentes por unidade.' : 'Um próximo passo na evolução da sua gestão.';
-  $('page-phase').textContent = employees ? 'ENTREGA 2.1' : 'ACESSO INICIAL';
+  $('page-phase').textContent = mesas ? 'ENTREGA 2.4' : employees ? 'GESTÃO DA EQUIPE' : 'ACESSO INICIAL';
   if (module) {
     $('module-title').textContent = module[1];
-    $('module-description').textContent = module[3];
+    $('module-description').textContent = id === 'comandas' ? 'As comandas de mesa e balcão estão disponíveis no acesso operacional com identificação e PIN. Pedidos e pagamentos ainda não estão disponíveis.' : module[3];
+    $('operational-link').hidden = id !== 'comandas';
+    $('module-unavailable').hidden = id === 'comandas';
     $('module-symbol').textContent = module[2];
   }
   document.querySelectorAll('.nav-button').forEach((button) => {
@@ -160,6 +168,7 @@ function selectEstablishment(activate = true) {
   const role = selected ? (roles[selected.funcao] || selected.funcao) : '—';
   $('establishment-role').textContent = selected ? `Sua função: ${role}` : 'Consulte o responsável pelo seu acesso.';
   $('user-role').textContent = role;
+  if (activate && !$('mesas-view').hidden) mesaScreen.activate(selected?.id);
   if (activate && !$('employee-view').hidden) employeeScreen.activate(selected?.id);
 }
 
@@ -194,7 +203,7 @@ async function loadEstablishments(preferred = requestedContext().unit, activate 
     establishments = [];
     $('establishment-name').textContent = 'Estabelecimentos indisponíveis';
     $('establishment-select').replaceChildren();
-    employeeScreen.reset();
+    employeeScreen.reset(); mesaScreen.reset();
     $('data-error-text').textContent = errorMessage(error);
     $('data-error').hidden = false;
     throw error;
@@ -258,7 +267,7 @@ for (const [id, title, icon, description] of [['dashboard', 'Visão geral', '⊞
   if (id !== 'dashboard') {
     const badge = document.createElement('span');
     badge.className = 'coming';
-    badge.textContent = id === 'funcionarios' ? 'Equipe' : 'Em breve';
+    badge.textContent = id === 'funcionarios' ? 'Equipe' : id === 'mesas' ? 'Gestão' : 'Em breve';
     button.append(badge);
     const card = document.createElement('button');
     card.type = 'button';
@@ -267,7 +276,7 @@ for (const [id, title, icon, description] of [['dashboard', 'Visão geral', '⊞
     top.className = 'card-top';
     const status = document.createElement('span');
     status.className = 'phase-badge';
-    status.textContent = id === 'funcionarios' ? 'GESTÃO DA EQUIPE' : 'EM DESENVOLVIMENTO';
+    status.textContent = id === 'funcionarios' ? 'GESTÃO DA EQUIPE' : id === 'mesas' ? 'GESTÃO DE MESAS' : 'EM DESENVOLVIMENTO';
     top.append(symbol.cloneNode(true), status);
     const name = document.createElement('strong');
     name.textContent = title;
@@ -294,7 +303,7 @@ $('logout').addEventListener('click', async () => {
   } finally { $('logout').disabled = false; }
 });
 $('retry').addEventListener('click', () => restoreSession());
-$('establishment-select').addEventListener('change', () => { employeeScreen.reset(); rememberContext('push'); restoreSession(); });
+$('establishment-select').addEventListener('change', () => { employeeScreen.reset(); mesaScreen.reset(); rememberContext('push'); restoreSession(); });
 $('back-dashboard').addEventListener('click', () => openPage('dashboard'));
 $('show-password').addEventListener('click', () => {
   const showing = $('password').type === 'password';
@@ -348,7 +357,7 @@ async function restoreContext() {
     if (current === generation) { $('login-submit').disabled = false; $('login-status').textContent = ''; }
   }
 }
-window.addEventListener('popstate', () => { employeeScreen.reset(); restoreSession(); });
+window.addEventListener('popstate', () => { employeeScreen.reset(); mesaScreen.reset(); restoreSession(); });
 window.addEventListener('hashchange', () => { if (authenticated) restoreSession(); });
 // Conferir a sessão ao voltar a uma aba, sem polling que prolongue a inatividade.
 document.addEventListener('visibilitychange', () => {

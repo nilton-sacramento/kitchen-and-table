@@ -1,6 +1,6 @@
 # Instalação local e variáveis
 
-Guia atual da branch da Entrega 2.3. Java 17/Spring Boot, Maven, JDBC/JdbcTemplate, Flyway, PostgreSQL 16 e frontend HTML/CSS/JavaScript servido pelo backend. Etapa 1 e Entregas 2.1/2.2 estão integradas à develop; a Entrega 2.3 está em revisão. Veja o [estado atual](../README.md).
+Guia da implementação local da Entrega 2.4. Java 17/Spring Boot, Maven, JDBC/JdbcTemplate, Flyway, PostgreSQL 16 e frontend HTML/CSS/JavaScript servido pelo backend. Etapa 1 e Entregas 2.1/2.2/2.3 estão integradas à develop; a Entrega 2.4 está em validação local. Veja o [estado atual](../README.md).
 
 ## Escolher o ambiente antes de iniciar
 
@@ -8,7 +8,15 @@ Guia atual da branch da Entrega 2.3. Java 17/Spring Boot, Maven, JDBC/JdbcTempla
 - Para o ambiente manual já preparado: usar os scripts em .tools/testes-manuais-2-3 e consultar [a organização dos testes](organizacao-testes.md). Preservar seu banco e os dados fictícios existentes. Não usar Compose ou Maven run para substituí-lo.
 - Para desenvolvimento novo: usar um PostgreSQL local genuinamente novo, sem conflito com volumes ou portas existentes. O exemplo abaixo é exclusivamente para esse caso.
 
-Iniciar a aplicação executa Flyway até V10. **Este guia não autoriza acesso ou migrações no PostgreSQL operacional.** Um banco com dados existentes exige plano próprio de backup, restauração ensaiada, compatibilidade e autorização. Não remover ou recriar volumes.
+Iniciar a aplicação executa Flyway até V12. **Este guia não autoriza acesso ou migrações no PostgreSQL operacional.** Um banco com dados existentes exige plano próprio de backup, restauração ensaiada, compatibilidade e autorização. Não remover ou recriar volumes.
+
+## Explorar mesas e comandas em ambiente isolado
+
+Com Docker ativo, execute mvn verify e depois node scripts/ambiente-atendimento.mjs. O script reutiliza a fixture de testes, cria PostgreSQL 16 novo em loopback e inicia Spring Boot em porta aleatória. Não lê DB_URL operacional. A URL exata e o caminho do arquivo privado de acessos aparecem no terminal; senhas e PINs não são impressos. Há proprietário, Atendente e Caixa fictícios e duas unidades; o mesmo Atendente tem vínculos independentes nas duas.
+
+No navegador, use a conta administrativa para administrar mesas e permissões. Saia antes de entrar em /operacional.html com unidade, vínculo e PIN do arquivo privado. Atendente/Caixa da unidade A têm concessões críticas explícitas apenas para exercitar o cenário; o vínculo B mantém seus próprios padrões. Esses dados existem somente na fixture.
+
+Ctrl+C no terminal encerra a fixture criada por esse processo. Reexecutar cria outro cenário novo; não substitui o cenário manual antigo nem preserva dados dessa demonstração descartável. O cenário histórico da Entrega 2.3 permanece separado e não deve receber migrações desta feature.
 
 ## Instalação nova no Windows
 

@@ -291,3 +291,18 @@ html{scroll-behavior:smooth}
 .role-preview{border:1px solid var(--line);border-radius:8px;padding:14px;overflow-wrap:anywhere}
 .role-preview h4{margin:0 0 10px}.role-preview ul{margin:8px 0;padding-left:20px;font-size:13px;line-height:1.8}
 @media(max-width:600px){.permission-module>.permission-group{padding:8px}.role-preview{padding:10px}}
+
+/* Mesas e atendimento: cartões flexíveis, ações acessíveis por teclado e toque. */
+.attendance-area { margin-top: 1.5rem; border-top: 1px solid #d8e2dc; padding-top: 1.5rem; min-width: 0; }
+.attendance-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 1rem; margin: 1rem 0; }
+.attendance-card { min-width: 0; background: #fff; border: 1px solid #d8e2dc; border-radius: 14px; padding: 1.2rem; overflow-wrap: anywhere; }
+.attendance-card h3 { margin-top: 0; }
+.attendance-state { font-weight: 700; color: #183e35; }
+.attendance-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin: .8rem 0; }
+.attendance-form { display: flex; flex-direction: column; gap: .7rem; max-width: 580px; padding: 1rem 0; }
+.attendance-form input,.attendance-form textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: .8rem; border: 1px solid #899b91; border-radius: 8px; font: inherit; }
+.attendance-form textarea { min-height: 110px; resize: vertical; }
+.attendance-area button,#mesas-view button { min-height: 44px; white-space: normal; margin: .2rem; }
+.attendance-area :focus-visible,#mesas-view :focus-visible { outline: 3px solid #b77915; outline-offset: 3px; }
+.operational-shell:has(.attendance-area) { max-width: 1100px; }
+@media(max-width:480px) { .attendance-card { padding: .85rem; } .attendance-actions>* { flex: 1 1 100%; } .attendance-area button,#mesas-view button { max-width: 100%; } }
