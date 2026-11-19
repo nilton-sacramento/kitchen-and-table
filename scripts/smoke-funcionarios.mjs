@@ -29,12 +29,20 @@ let chrome, socket;
 const profile = path.join(tools, `chrome-test-${crypto.randomUUID()}`);
 let sequence = 0;
 const pending = new Map();
-function cdp(method, params = {}) {
+function sendCdp(method, params = {}) {
   return new Promise((resolve, reject) => {
     const id = ++sequence;
     const timer = setTimeout(() => { pending.delete(id); reject(new Error(`CDP sem resposta: ${method}`)); }, 15000);
     pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method, params }));
   });
+}
+// Reload so termina quando existe outro documento, evitando validar o DOM anterior.
+async function cdp(method,params={}){
+ if(method!=='Page.reload')return sendCdp(method,params);
+ const before=(await sendCdp('Runtime.evaluate',{expression:'performance.timeOrigin',returnByValue:true})).result.value;
+ const result=await sendCdp(method,params);
+ for(let i=0;i<100;i++){try{const state=await sendCdp('Runtime.evaluate',{expression:'({origin:performance.timeOrigin,ready:document.readyState})',returnByValue:true});if(state.result?.value?.origin!==before&&state.result?.value?.ready==='complete')return result;}catch{}await pause(150);}
+ throw Error('Atualizacao nao concluiu em novo documento');
 }
 async function evaluate(expression) {
   const result = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
@@ -49,7 +57,7 @@ async function wait(expression, description) {
     if (ready) return;
     await pause(150);
   }
-  const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState,operationalHidden:document.getElementById('op-protected')?.hidden,operationalError:document.getElementById('op-error')?.textContent,operationalState:document.getElementById('op-state')?.textContent})").catch(() => ({}));
+  const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState,operationalHidden:document.getElementById('op-protected')?.hidden,operationalError:document.getElementById('op-error')?.textContent,operationalState:document.getElementById('op-state')?.textContent,attendance:document.querySelector('.attendance-area')?.textContent.slice(-1200),route:location.hash})").catch(() => ({}));
   console.log('DIAGNOSTIC:', JSON.stringify(diagnostic));
   throw new Error(`Tempo esgotado: ${description}`);
 }

@@ -54,6 +54,11 @@ jobs:
 
       - name: Sintaxe JavaScript
         run: |
+          node --check src/main/resources/static/assets/pedidos.js
+          node --check src/main/resources/static/assets/pedido-editor.js
+          node --check src/main/resources/static/assets/pedido-contratos.js
+          node --check src/main/resources/static/assets/pedido-ui.js
+          node --check src/main/resources/static/assets/producao.js
           node --check src/main/resources/static/assets/cardapio.js
           node --check src/main/resources/static/assets/mesas.js
           node --check src/main/resources/static/assets/atendimento.js
@@ -63,13 +68,14 @@ jobs:
           node --check src/main/resources/static/assets/permissoes.js
           node --check src/main/resources/static/assets/operacional.js
           node --check src/main/resources/static/assets/seguranca-operacional.js
+          node --check scripts/smoke-pedidos.mjs
           node --check scripts/smoke-cardapio.mjs
           node --check scripts/smoke-mesas-comandas.mjs
           node --check scripts/smoke-operacional.mjs
           node --check scripts/smoke-funcionarios.mjs
 
       - name: Testes de contexto e rascunhos
-        run: node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs
+        run: node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs scripts/test-pedidos.mjs
 
       - name: Compilacao, testes e empacotamento
         run: mvn --batch-mode --no-transfer-progress -Ddebug=false -Dlogging.level.org.springframework=INFO verify
