@@ -8,11 +8,12 @@ Guia da estrutura real. A aplicação segue Maven e Spring Boot; frontend e back
 | Autenticação | src/main/java/com/kitchentable/auth/ | Sessão, conta e setup técnico |
 | Configuração web | src/main/java/com/kitchentable/config/ | Spring Security e health |
 | Funcionários e acesso | src/main/java/com/kitchentable/funcionarios/ | Vínculos, associação, autorização, permissões, auditoria e operação por PIN |
+| Mesas e comandas | src/main/java/com/kitchentable/mesas/ e comandas/ | Administração de mesas e atendimento com PIN, permissões e auditoria |
 | Tela administrativa | src/main/resources/static/index.html | Login e painel administrativo |
 | Tela operacional | src/main/resources/static/operacional.html | Identificação e desbloqueio operacional |
 | Interface e estilos | src/main/resources/static/assets/ | JavaScript nativo e CSS responsivo |
 | Ambiente | src/main/resources/application.yml | Variáveis externas e sessão |
-| Banco | src/main/resources/db/migration/ | Flyway V1–V10; preservar migrações existentes |
+| Banco | src/main/resources/db/migration/ | Flyway V1–V12; preservar migrações existentes |
 | Testes Java | src/test/java/com/kitchentable/ | Segurança, integração e fixture Chrome |
 | Smoke | scripts/ | Controladores Node do smoke descartável |
 | Automação GitHub | .github/ | Workflow ativo, Dependabot, template de PR e template histórico de CI |
@@ -28,6 +29,8 @@ Guia da estrutura real. A aplicação segue Maven e Spring Boot; frontend e back
 - permissoes.js: funções, exceções e delegações.
 - seguranca-operacional.js: administração de PIN, bloqueio e eventos.
 - operacional.js: entrada, inatividade, troca e logout operacional.
+- mesas.js: administração de mesas por estabelecimento.
+- atendimento.js: comandas de mesa/balcão no acesso operacional.
 - app.css: estilos compartilhados.
 
 Todos ficam em src/main/resources/static/assets. As validações de negócio e autorização ficam nos serviços Java, não apenas nos controles visuais. Não mover assets sem atualizar HTML, imports, segurança, testes e CI.
