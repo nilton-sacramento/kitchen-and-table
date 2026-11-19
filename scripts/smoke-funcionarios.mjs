@@ -42,7 +42,13 @@ async function evaluate(expression) {
   return result.result.value;
 }
 async function wait(expression, description) {
-  for (let i = 0; i < 100; i++) { if (await evaluate(expression) && await evaluate("document.getElementById('employee-view')?.getAttribute('aria-busy')!=='true'")) return; await pause(150); }
+  // Page.reload pode responder antes de o novo DOM estar pronto (observado no CI Linux).
+  // Avaliar a mesma condicao somente no documento completo, em uma unica chamada.
+  for (let i = 0; i < 100; i++) {
+    const ready = await evaluate(`(async()=>{if(document.readyState!=='complete')return false;return Boolean(await (${expression})) && document.getElementById('employee-view')?.getAttribute('aria-busy')!=='true';})()`);
+    if (ready) return;
+    await pause(150);
+  }
   const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState,operationalHidden:document.getElementById('op-protected')?.hidden,operationalError:document.getElementById('op-error')?.textContent,operationalState:document.getElementById('op-state')?.textContent})").catch(() => ({}));
   console.log('DIAGNOSTIC:', JSON.stringify(diagnostic));
   throw new Error(`Tempo esgotado: ${description}`);
@@ -268,7 +274,7 @@ try {
   pass('permissoes: backend bloqueia gerente, concessao e revogacao em sessao aberta');
   // Voltar ao proprietario para repetir o logout/senha incorreta originais.
   await evaluate(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();await fetch('/api/v1/auth/logout',{method:'POST',headers:{[c.headerName]:c.token}});const fresh=await(await fetch('/api/v1/auth/csrf')).json();return(await fetch('/api/v1/auth/login',{method:'POST',headers:{[fresh.headerName]:fresh.token},body:new URLSearchParams({email:${JSON.stringify(credential.email)},password:${JSON.stringify(credential.password)}})})).status})()`);
-  await cdp('Page.reload');await wait("!document.getElementById('app-view').hidden",'retorno ao proprietario');
+  await cdp('Page.reload');await wait("!!document.getElementById('app-view') && !document.getElementById('app-view').hidden",'retorno ao proprietario');
   await smokeOperational({fixture,targetLink,credential,cdp,evaluate,wait,press,pause,pass,ownerEval,artifacts,fs,path});
   ownerSocket.close();await browserCommand('Target.disposeBrowserContext',{browserContextId:context.browserContextId});
   await evaluate("document.getElementById('logout').click();true");
