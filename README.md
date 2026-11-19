@@ -4,7 +4,7 @@ SaaS de gestão para restaurantes, bares e lanchonetes, desenvolvido por entrega
 
 ## Situação do desenvolvimento
 
-Etapa 1 e Entregas 2.1–2.4 estão integradas à develop (base 48abeeb). A Entrega 2.5 — cardápio, produtos e combos — está implementada e validada localmente na feature/entrega-2-5-cardapio-produtos, com fluxo de Pull Request Draft para develop. A Entrega 2.6 será desenvolvida em branch própria após validar e publicar a 2.5. Não é uma versão de produção.
+Etapa 1 e Entregas 2.1–2.4 estão integradas à develop (base 48abeeb). A Entrega 2.5 está publicada no PR #7 Draft para develop. Esta branch implementa a Entrega 2.6 — pedidos, cozinha, bar e entrega — sobre o HEAD validado ff14891 da 2.5, com PR Draft encadeado. Não é uma versão de produção.
 
 Implementado nesta branch (contratos e validações em [Entrega 2.4](docs/entrega-2-4.md)):
 
@@ -17,7 +17,7 @@ Implementado nesta branch (contratos e validações em [Entrega 2.4](docs/entreg
 - Função principal, funções adicionais, exceções individuais, delegações administrativas e auditoria.
 - PIN operacional por vínculo, bloqueio persistente após tentativas incorretas, desbloqueio/redefinição autorizados, inatividade e troca de operador.
 
-Pedidos, caixa e demais módulos futuros continuam indisponíveis na Entrega 2.5. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
+Pedidos, filas de cozinha/bar, preparo, entregas e decisões setoriais estão implementados nesta feature 2.6; veja [contratos e limites](docs/entrega-2-6.md). Caixa financeiro e demais módulos futuros continuam indisponíveis. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
 
 Esta branch inclui restauração da seção/unidade, rascunhos elegíveis e organização/prévia de permissões, validados com PostgreSQL descartável em 18/11/2026. Consulte [implementação, testes e limites](docs/interface-contexto-permissoes.md); o [planejamento anterior](docs/planejamento-correcoes-interface.md) permanece como referência.
 
@@ -48,7 +48,7 @@ Consulte o [guia da estrutura](docs/estrutura-projeto.md), o [índice da documen
 
 Pré-requisitos: Java 17, Maven e Docker Desktop. Para smoke: Node 24 e Chrome instalado. Execute os comandos na raiz do clone.
 
-**Esta feature aplica migrações até V14 ao iniciar. Não execute contra o PostgreSQL operacional.** Use somente um banco local novo explicitamente destinado ao desenvolvimento ou as fixtures descartáveis. Veja [instalação e variáveis](docs/instalacao-local.md) e [compatibilidade das migrações](docs/entrega-2-3.md).
+**Esta feature aplica migrações até V16 ao iniciar. Não execute contra o PostgreSQL operacional.** Use somente um banco local novo explicitamente destinado ao desenvolvimento ou as fixtures descartáveis. Veja [instalação e variáveis](docs/instalacao-local.md) e [compatibilidade das migrações](docs/entrega-2-3.md).
 
 Somente para uma instalação local genuinamente nova, sem conflito de porta/volume com outros bancos:
 
@@ -76,7 +76,7 @@ node scripts/test-interface-browser.mjs
 node scripts/smoke-funcionarios.mjs
 ```
 
-O Maven compila, testa e empacota. A suíte da Entrega 2.5 contém 220 testes Java aprovados (183 preservados e 37 novos), sem falhas, erros ou ignorados. Os resultados e limites estão em docs/entrega-2-5.md. A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
+O Maven compila, testa e empacota. A suíte desta branch 2.6 contém 276 testes Java aprovados (183 anteriores, 37 de cardápio e 56 de pedidos), sem falhas, erros ou ignorados. Os testes Node somam 32; o Chrome com API controlada mantém 26 verificações, separadas do smoke com backend real. Resultados e limites em [Entrega 2.5](docs/entrega-2-5.md) e [Entrega 2.6](docs/entrega-2-6.md). A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
 
 A expiração automatizada pode ser executada separadamente com `mvn '-Dtest=SessionInactivityIntegrationTest' test`; o prazo reduzido existe somente no teste. O prazo administrativo normal permanece 30 minutos.
 
