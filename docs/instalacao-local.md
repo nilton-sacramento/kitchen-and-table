@@ -8,7 +8,7 @@ Guia da implementação local da Entrega 2.4. Java 17/Spring Boot, Maven, JDBC/J
 - Para o ambiente manual já preparado: usar os scripts em .tools/testes-manuais-2-3 e consultar [a organização dos testes](organizacao-testes.md). Preservar seu banco e os dados fictícios existentes. Não usar Compose ou Maven run para substituí-lo.
 - Para desenvolvimento novo: usar um PostgreSQL local genuinamente novo, sem conflito com volumes ou portas existentes. O exemplo abaixo é exclusivamente para esse caso.
 
-Iniciar a aplicação executa Flyway até V12. **Este guia não autoriza acesso ou migrações no PostgreSQL operacional.** Um banco com dados existentes exige plano próprio de backup, restauração ensaiada, compatibilidade e autorização. Não remover ou recriar volumes.
+Iniciar a aplicação executa Flyway até V14. **Este guia não autoriza acesso ou migrações no PostgreSQL operacional.** Um banco com dados existentes exige plano próprio de backup, restauração ensaiada, compatibilidade e autorização. Não remover ou recriar volumes.
 
 ## Explorar mesas e comandas em ambiente isolado
 

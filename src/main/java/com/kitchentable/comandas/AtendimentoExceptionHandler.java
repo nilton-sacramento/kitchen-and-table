@@ -6,7 +6,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-@RestControllerAdvice(assignableTypes = {MesaController.class, ComandaController.class})
+@RestControllerAdvice(assignableTypes = {MesaController.class, ComandaController.class, com.kitchentable.cardapio.CardapioController.class, com.kitchentable.cardapio.CopiaCardapioController.class})
 public class AtendimentoExceptionHandler {
   @ExceptionHandler(ResponseStatusException.class)
   public ResponseEntity<ProblemDetail> status(ResponseStatusException e) {

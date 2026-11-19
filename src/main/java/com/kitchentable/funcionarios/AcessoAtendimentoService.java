@@ -25,6 +25,14 @@ public class AcessoAtendimentoService {
   }
 
   public Ator administrador(UUID unidade, Authentication a, boolean escrita) {
+    return administrador(unidade, a, escrita, "MESA_GERENCIAR");
+  }
+
+  public void bloquearUnidades(UUID... unidades) {
+    repo.bloquearUnidades(unidades);
+  }
+
+  public Ator administrador(UUID unidade, Authentication a, boolean escrita, String codigo) {
     if (a == null || !a.isAuthenticated()) throw erro(HttpStatus.UNAUTHORIZED, "Entre novamente");
     if (a.getAuthorities().stream().noneMatch(x -> x.getAuthority().equals("ROLE_USER")))
       throw erro(HttpStatus.FORBIDDEN, "Exige acesso administrativo");
@@ -32,8 +40,8 @@ public class AcessoAtendimentoService {
     else repo.validarUnidade(unidade);
     var ator = repo.ator(unidade, a.getName());
     if (!Set.of("PROPRIETARIO", "GERENTE").contains(ator.funcao()))
-      throw erro(HttpStatus.FORBIDDEN, "Administracao de mesas nao autorizada");
-    permissoes.exigirExistente(ator.vinculo(), "MESA_GERENCIAR");
+      throw erro(HttpStatus.FORBIDDEN, "Administracao nao autorizada");
+    permissoes.exigirExistente(ator.vinculo(), codigo);
     var f = repo.buscar(unidade, ator.vinculo());
     return new Ator(ator.id(), ator.vinculo(), f.nome());
   }

@@ -1,3 +1,4 @@
+import { renderOperationalMenu } from './cardapio.js';
 // Tela operacional. O header é precondição contra abas antigas, nunca autenticação.
 const node = (tag, text = "", cls = "") => {
   const e = document.createElement(tag);
@@ -27,7 +28,7 @@ export function readAttendanceRoute(hash) {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
   const id = p.get("comanda");
   return {
-    page: p.get("atendimento") === "comandas" ? "comandas" : "mesas",
+    page: ["comandas","cardapio"].includes(p.get("atendimento")) ? p.get("atendimento") : "mesas",
     id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       id || "",
     )
@@ -101,6 +102,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     content.replaceChildren(node("p", "Consultando atendimento…", "muted"));
     message.hidden = true;
     try {
+      if (page === "cardapio") { if(!allowed("PRODUTO_CONSULTAR")){content.replaceChildren(node("p","Consulta não autorizada."));return;}const menu=await request("cardapio");if(!disposed&&current===version)renderOperationalMenu(content,menu);return; }
       if (id) {
         await detail(id, current);
         return;
@@ -366,6 +368,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     window.removeEventListener("popstate", navigate);
     window.removeEventListener("hashchange", navigate);
   }
+  if(allowed("PRODUTO_CONSULTAR"))navigation.append(button("Cardápio",()=>route("cardapio")));
   const r = readAttendanceRoute(location.hash);
   route(r.page, r.id, false);
   return { destroy };
