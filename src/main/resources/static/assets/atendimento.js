@@ -1,4 +1,5 @@
-import { renderOperationalMenu } from './cardapio.js';
+import { createPedidosScreen } from "./pedidos.js";
+import { renderOperationalMenu } from "./cardapio.js";
 // Tela operacional. O header é precondição contra abas antigas, nunca autenticação.
 const node = (tag, text = "", cls = "") => {
   const e = document.createElement(tag);
@@ -28,7 +29,11 @@ export function readAttendanceRoute(hash) {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
   const id = p.get("comanda");
   return {
-    page: ["comandas","cardapio"].includes(p.get("atendimento")) ? p.get("atendimento") : "mesas",
+    page: ["comandas", "cardapio", "cozinha", "bar"].includes(
+      p.get("atendimento"),
+    )
+      ? p.get("atendimento")
+      : "mesas",
     id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       id || "",
     )
@@ -40,7 +45,8 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
   let disposed = false,
     version = 0,
     busy = false,
-    pending = null;
+    pending = null,
+    pedidos = null;
   const unit = context.estabelecimentoId,
     actor = context.vinculoId;
   const allowed = (code) =>
@@ -55,7 +61,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     node("h2", "Atendimento"),
     node(
       "p",
-      "Comandas sem consumo. Encerrar aqui não registra pagamento.",
+      "Mesas, comandas e pedidos da unidade. Encerramento operacional não registra pagamento.",
       "muted",
     ),
     navigation,
@@ -76,7 +82,9 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
       return;
     }
     message.textContent =
-      e.message ||
+      (e instanceof TypeError
+        ? "Não foi possível carregar esta tela. Atualize a página ou procure o responsável."
+        : e.message) ||
       "Não foi possível confirmar a operação. Confira a conexão e atualize a lista antes de abrir outro atendimento.";
     message.hidden = false;
   }
@@ -98,12 +106,50 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     void render(page, id);
   }
   async function render(page, id) {
+    pedidos?.destroy();
+    pedidos = null;
     const current = ++version;
     content.replaceChildren(node("p", "Consultando atendimento…", "muted"));
     message.hidden = true;
     try {
-      if (page === "cardapio") { if(!allowed("PRODUTO_CONSULTAR")){content.replaceChildren(node("p","Consulta não autorizada."));return;}const menu=await request("cardapio");if(!disposed&&current===version)renderOperationalMenu(content,menu);return; }
+      if (["cozinha", "bar"].includes(page)) {
+        const sector = page.toUpperCase();
+        if (!allowed(sector + "_FILA_CONSULTAR")) {
+          content.replaceChildren(node("p", "Consulta não autorizada."));
+          return;
+        }
+        const area = node("section");
+        content.replaceChildren(area);
+        pedidos = createPedidosScreen({
+          root: area,
+          request,
+          allowed,
+          onError: fail,
+          isCurrent: () => !disposed && current === version,
+        });
+        await pedidos.queue(sector);
+        return;
+      }
+      if (page === "cardapio") {
+        if (!allowed("PRODUTO_CONSULTAR")) {
+          content.replaceChildren(node("p", "Consulta não autorizada."));
+          return;
+        }
+        const menu = await request("cardapio");
+        if (!disposed && current === version)
+          renderOperationalMenu(content, menu);
+        return;
+      }
       if (id) {
+        if (!allowed("COMANDA_CONSULTAR")) {
+          content.replaceChildren(
+            node(
+              "p",
+              "Seu acesso permite as filas do setor. Escolha Cozinha ou Bar no menu autorizado.",
+            ),
+          );
+          return;
+        }
         await detail(id, current);
         return;
       }
@@ -259,7 +305,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
       ),
     );
     if (c.justificativa) card.append(node("p", "Motivo: " + c.justificativa));
-    if (c.estado === "ABERTA") {
+    if (c.estado === "ABERTA" && !c.teveConsumo && !c.possuiPendencias) {
       card.append(
         node(
           "p",
@@ -298,6 +344,18 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
       node("h3", "Histórico do atendimento"),
       history,
     );
+    if (allowed("PEDIDO_CONSULTAR")) {
+      const area = node("section", "", "pedidos-area");
+      content.insertBefore(area, card.nextSibling);
+      pedidos = createPedidosScreen({
+        root: area,
+        request,
+        allowed,
+        onError: fail,
+        isCurrent: () => !disposed && current === version,
+      });
+      await pedidos.comanda(c);
+    }
   }
   function finish(c, cancel) {
     if (busy || disposed) return;
@@ -361,6 +419,8 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
   window.addEventListener("popstate", navigate);
   window.addEventListener("hashchange", navigate);
   function destroy() {
+    pedidos?.destroy();
+    pedidos = null;
     disposed = true;
     version++;
     pending = null;
@@ -368,7 +428,13 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     window.removeEventListener("popstate", navigate);
     window.removeEventListener("hashchange", navigate);
   }
-  if(allowed("PRODUTO_CONSULTAR"))navigation.append(button("Cardápio",()=>route("cardapio")));
+  if (allowed("PRODUTO_CONSULTAR"))
+    navigation.append(button("Cardápio", () => route("cardapio")));
+  for (const [code, label, page] of [
+    ["COZINHA_FILA_CONSULTAR", "Cozinha", "cozinha"],
+    ["BAR_FILA_CONSULTAR", "Bar", "bar"],
+  ])
+    if (allowed(code)) navigation.append(button(label, () => route(page)));
   const r = readAttendanceRoute(location.hash);
   route(r.page, r.id, false);
   return { destroy };
