@@ -1,3 +1,4 @@
+import { createAtendimentoScreen } from './atendimento.js';
 // Rascunhos apenas em memoria, isolados por operador/unidade; nenhuma credencial, identidade ou rascunho em Web Storage.
 export function createOperationalDrafts(){
   let owner=null,unlocked=false;const values=new Map();
@@ -19,11 +20,12 @@ const el=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textConten
 if(document.getElementById('operational-root')){
   const $=id=>document.getElementById(id);const drafts=createOperationalDrafts();
   let storage=null;try{storage=window.sessionStorage;}catch{}const lockState=createOperationalLockState(storage);
+  let atendimento=null;
   let unlocked=false,generation=0,deadline=0,timer=null,activityTimer=null,lastTouch=0,context=null,submitting=false,adminSession=false,loggingOut=false,pendingLogin=null,leaving=false,visibilityTimer=null;
-  async function api(path,method='GET',body){
-    const started=performance.now();const headers={};if(method!=='GET'){const c=await(await fetch('/api/v1/auth/csrf',{credentials:'same-origin',cache:'no-store'})).json();headers[c.headerName]=c.token;if(body)headers['Content-Type']='application/json';}
+  async function api(path,method='GET',body,extraHeaders={}){
+    const started=performance.now();const headers={...extraHeaders};if(method!=='GET'){const c=await(await fetch('/api/v1/auth/csrf',{credentials:'same-origin',cache:'no-store'})).json();headers[c.headerName]=c.token;if(body)headers['Content-Type']='application/json';}
     const response=await fetch(`/api/v1/${path}`,{method,credentials:'same-origin',cache:'no-store',headers,...(body?{body:JSON.stringify(body)}:{})});
-    if(!response.ok){const e=new Error(response.status===401?'Não foi possível desbloquear. Confira os dados ou procure o responsável.':'Não foi possível confirmar a operação. Tente novamente ou procure o responsável.');e.status=response.status;throw e;}
+    if(!response.ok){const e=new Error(response.status===401?'Não foi possível desbloquear. Confira os dados ou procure o responsável.':'Não foi possível confirmar a operação. Tente novamente ou procure o responsável.');if(path.includes('/estabelecimentos/')){try{const problem=await response.json();if(typeof problem.detail==='string')e.message=problem.detail;}catch{}}e.status=response.status;throw e;}
     if(response.status===204)return null;const result=await response.json();
     const c=result?.contexto||(typeof result?.validadeMs==='number'?result:null);
     if(c)c.validadeMs=Math.max(0,c.validadeMs-(performance.now()-started));
@@ -31,17 +33,18 @@ if(document.getElementById('operational-root')){
   }
   function error(text){$('op-error').textContent=text;$('op-error').hidden=!text;}
   function mask(message='Acesso bloqueado. Informe sua identificação e PIN novamente.'){
-    lockState.require();generation++;unlocked=false;context=null;clearTimeout(timer);clearTimeout(activityTimer);drafts.lock();$('op-protected').replaceChildren();$('op-protected').hidden=true;$('op-locked').hidden=false;$('op-state').textContent=message;$('op-pin').value='';
+    atendimento?.destroy();atendimento=null;lockState.require();generation++;unlocked=false;context=null;clearTimeout(timer);clearTimeout(activityTimer);drafts.lock();$('op-protected').replaceChildren();$('op-protected').hidden=true;$('op-locked').hidden=false;$('op-state').textContent=message;$('op-pin').value='';
   }
   function schedule(c){deadline=performance.now()+c.validadeMs;clearTimeout(timer);timer=setTimeout(()=>lock(),Math.max(0,c.validadeMs));}
   function show(c){
     if(c.validadeMs<=0){void lock();return;}
     const unchanged=unlocked&&context&&context.vinculoId===c.vinculoId&&context.estabelecimentoId===c.estabelecimentoId&&context.nome===c.nome&&context.estabelecimento===c.estabelecimento&&JSON.stringify(context.permissoes)===JSON.stringify(c.permissoes);
     if(unchanged){context=c;schedule(c);return;}
-    const key=`${c.estabelecimentoId}:${c.vinculoId}`;drafts.bind(key);context=c;unlocked=true;schedule(c);$('op-error').hidden=true;$('op-locked').hidden=true;$('op-protected').hidden=false;$('op-protected').replaceChildren();
+    atendimento?.destroy();atendimento=null;const key=`${c.estabelecimentoId}:${c.vinculoId}`;drafts.bind(key);context=c;unlocked=true;schedule(c);$('op-error').hidden=true;$('op-locked').hidden=true;$('op-protected').hidden=false;$('op-protected').replaceChildren();
     $('op-protected').append(el('h2','Acesso desbloqueado'),el('strong',c.nome),el('p',c.estabelecimento,'muted'),el('p','Sua identidade está validada no servidor. Pedidos, caixa, estoque e demais operações ainda não foram disponibilizados.','muted small'));
     const allowed=c.permissoes.filter(p=>p.permissao.disponivel&&p.efetiva);$('op-protected').append(el('p',allowed.length?`Capacidades operacionais disponíveis: ${allowed.map(p=>p.permissao.nome).join(', ')}`:'Nenhuma operação dos módulos futuros está habilitada.'));
     for(const [label,action] of [['Bloquear agora',()=>lock()],['Trocar operador',()=>lock(true)]]){const b=el('button',label,'secondary');b.type='button';b.addEventListener('click',action);$('op-protected').append(b);}
+    const area=el('section','','attendance-area');$('op-protected').append(area);atendimento=createAtendimentoScreen({root:area,context:c,api,onBlocked:()=>mask('Acesso alterado ou bloqueado. Informe o PIN para revalidar suas permissões.')});
     $('op-exit').textContent='Sair do acesso operacional';
   }
   async function lock(switchOperator=false){
@@ -88,7 +91,7 @@ if(document.getElementById('operational-root')){
     if(document.visibilityState==='hidden'&&unlocked)visibilityTimer=setTimeout(()=>{if(!leaving&&document.visibilityState==='hidden'&&unlocked)void lock();},0);
     else if(document.visibilityState==='visible'&&unlocked)void refresh();
   });
-  window.addEventListener('pagehide',()=>{leaving=true;clearTimeout(visibilityTimer);drafts.lock();$('op-protected').replaceChildren();$('op-protected').hidden=true;});
+  window.addEventListener('pagehide',()=>{leaving=true;atendimento?.destroy();atendimento=null;clearTimeout(visibilityTimer);drafts.lock();$('op-protected').replaceChildren();$('op-protected').hidden=true;});
   window.addEventListener('pageshow',e=>{leaving=false;if(e.persisted){mask();refresh(true);}});
   setInterval(()=>{if(unlocked&&document.visibilityState==='visible'){if(performance.now()>=deadline)lock();else refresh();}},5000);
   refresh(true);
