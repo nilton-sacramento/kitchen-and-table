@@ -91,7 +91,10 @@ public class ComandaService {
       throw erro(HttpStatus.BAD_REQUEST, "Informe a justificativa do cancelamento");
     // Latch de consumo e contrato fail-closed: habilitar pedidos/financeiro exige revisar a
     // integracao.
-    if (antes.teveConsumo() || antes.possuiPendencias() || repo.integracaoConsumoHabilitada())
+    if (antes.teveConsumo()
+        || antes.possuiPendencias()
+        || repo.possuiPedidos(u, id)
+        || repo.integracaoConsumoHabilitada())
       throw erro(
           HttpStatus.CONFLICT,
           "Encerramento operacional indisponivel: ha consumo, pendencias ou integracao financeira a"

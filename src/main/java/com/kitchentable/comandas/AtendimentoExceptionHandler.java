@@ -6,7 +6,14 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-@RestControllerAdvice(assignableTypes = {MesaController.class, ComandaController.class, com.kitchentable.cardapio.CardapioController.class, com.kitchentable.cardapio.CopiaCardapioController.class})
+@RestControllerAdvice(
+    assignableTypes = {
+      MesaController.class,
+      ComandaController.class,
+      com.kitchentable.cardapio.CardapioController.class,
+      com.kitchentable.cardapio.CopiaCardapioController.class,
+      com.kitchentable.pedidos.PedidoController.class
+    })
 public class AtendimentoExceptionHandler {
   @ExceptionHandler(ResponseStatusException.class)
   public ResponseEntity<ProblemDetail> status(ResponseStatusException e) {
@@ -17,7 +24,10 @@ public class AtendimentoExceptionHandler {
                 e.getReason() == null ? "Operacao indisponivel" : e.getReason()));
   }
 
-  @ExceptionHandler(DataIntegrityViolationException.class)
+  @ExceptionHandler({
+    DataIntegrityViolationException.class,
+    org.springframework.dao.ConcurrencyFailureException.class
+  })
   public ResponseEntity<ProblemDetail> conflito() {
     return ResponseEntity.status(409)
         .body(

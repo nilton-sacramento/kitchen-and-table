@@ -15,7 +15,7 @@ public class AuditoriaAdministrativaService {
         persistir(unidade,executor,vinculoExecutor,null,tipo,"VINCULO_FUNCIONARIO",alvo,antes,depois);
     }
     public void registrarOperacao(UUID unidade,UUID executor,UUID vinculoExecutor,String nome,String tipo,String entidade,UUID alvo,Object antes,Object depois) {
-        if(!Set.of("MESA","COMANDA","CATEGORIA","PRODUTO","COMBO","ESTOQUE","COPIA_CARDAPIO").contains(entidade))throw new IllegalArgumentException("Entidade nao autorizada");
+        if(!Set.of("MESA","COMANDA","CATEGORIA","PRODUTO","COMBO","ESTOQUE","COPIA_CARDAPIO","PEDIDO","SOLICITACAO_PEDIDO").contains(entidade))throw new IllegalArgumentException("Entidade nao autorizada");
         persistir(unidade,executor,vinculoExecutor,nome,tipo,entidade,alvo,antes,depois);
     }
     private void persistir(UUID unidade,UUID executor,UUID vinculoExecutor,String nome,String tipo,String entidade,UUID alvo,Object antes,Object depois) {

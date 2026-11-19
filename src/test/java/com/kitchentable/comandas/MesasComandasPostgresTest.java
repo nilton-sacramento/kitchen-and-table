@@ -237,7 +237,7 @@ class MesasComandasPostgresTest {
         j.queryForList(
             "SELECT version,checksum FROM flyway_schema_history WHERE version::int<=10 ORDER BY"
                 + " installed_rank"));
-    assertEquals(14,
+    assertEquals(16,
         j.queryForObject(
             "SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL", Integer.class));
     assertTrue(j.queryForObject("SELECT version()", String.class).contains("PostgreSQL 16"));
@@ -494,14 +494,14 @@ class MesasComandasPostgresTest {
     grant(f.vinculoId(), "COMANDA_ENCERRAR", true);
     var c = open(null);
     try {
-      j.update("UPDATE permissoes SET disponivel=true WHERE codigo='PEDIDO_REGISTRAR'");
+      j.update("UPDATE permissoes SET disponivel=true WHERE codigo='PAGAMENTO_REGISTRAR'");
       assertEquals(
           409,
           statusOf(
               () ->
                   comandas.finalizar(a, c.id(), p, f.vinculoId(), new Transicao(0L, null), false)));
     } finally {
-      j.update("UPDATE permissoes SET disponivel=false WHERE codigo='PEDIDO_REGISTRAR'");
+      j.update("UPDATE permissoes SET disponivel=false WHERE codigo='PAGAMENTO_REGISTRAR'");
     }
   }
 
