@@ -37,7 +37,9 @@ public final class FuncionariosBrowserFixture {
                 jdbc.update("INSERT INTO usuarios_estabelecimentos(id,usuario_id,estabelecimento_id,funcao_id) SELECT ?,?,?,id FROM funcoes WHERE codigo='GERENTE'",managerLink,manager,unit);
                 jdbc.update("INSERT INTO delegacoes_administrativas(vinculo_id,consultar,funcoes) VALUES(?,true,ARRAY['ATENDENTE'])",managerLink);
                 int port=((ServletWebServerApplicationContext)context).getWebServer().getPort();
-                System.out.println("KT_BROWSER_READY "+json.writeValueAsString(Map.of("url","http://127.0.0.1:"+port,"estabelecimentoId",unit,"destinoId",second,"managerVinculo",managerLink)));
+                var ready=new LinkedHashMap<String,Object>(Map.of("url","http://127.0.0.1:"+port,"estabelecimentoId",unit,"destinoId",second,"managerVinculo",managerLink));
+                if(fixture.path("atendimento").asBoolean(false))ready.putAll(AtendimentoFixtureData.preparar(context,fixture,unit,second));
+                System.out.println("KT_BROWSER_READY "+json.writeValueAsString(ready));
                 input.readLine(); // Somente o controlador de teste sinaliza encerramento.
             }
         }
