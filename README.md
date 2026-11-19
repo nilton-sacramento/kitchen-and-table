@@ -4,10 +4,11 @@ SaaS de gestão para restaurantes, bares e lanchonetes, desenvolvido por entrega
 
 ## Situação do desenvolvimento
 
-Etapa 1 e Entregas 2.1/2.2/2.3 estão integradas à develop (base 2c3322e). A Entrega 2.4 — mesas e comandas — está preparada para auditoria técnica na feature/entrega-2-4-mesas-comandas, com fluxo de Pull Request Draft para develop. A integração depende de revisão e autorização específica. Não é uma versão de produção.
+Etapa 1 e Entregas 2.1–2.4 estão integradas à develop (base 48abeeb). A Entrega 2.5 — cardápio, produtos e combos — está implementada e validada localmente na feature/entrega-2-5-cardapio-produtos, com fluxo de Pull Request Draft para develop. A Entrega 2.6 será desenvolvida em branch própria após validar e publicar a 2.5. Não é uma versão de produção.
 
 Implementado nesta branch (contratos e validações em [Entrega 2.4](docs/entrega-2-4.md)):
 
+- Cardápio por unidade: categorias, produtos cozinha/bar, preços exatos, disponibilidade, quantidades auditadas, combos, cópia autorizada e consulta operacional por PIN. Validação em [Entrega 2.5](docs/entrega-2-5.md).
 - Mesas por unidade e atendimento operacional: comandas de mesa/balcão, idempotência, cancelamento e encerramento sem consumo/pagamento, com auditoria.
 
 - Login administrativo por sessão, CSRF, BCrypt, restauração da autenticação após F5 e logout com invalidação no servidor.
@@ -16,7 +17,7 @@ Implementado nesta branch (contratos e validações em [Entrega 2.4](docs/entreg
 - Função principal, funções adicionais, exceções individuais, delegações administrativas e auditoria.
 - PIN operacional por vínculo, bloqueio persistente após tentativas incorretas, desbloqueio/redefinição autorizados, inatividade e troca de operador.
 
-O catálogo de permissões de produtos, pedidos, caixa e outros módulos futuros não representa operações disponíveis. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
+Pedidos, caixa e demais módulos futuros continuam indisponíveis na Entrega 2.5. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
 
 Esta branch inclui restauração da seção/unidade, rascunhos elegíveis e organização/prévia de permissões, validados com PostgreSQL descartável em 18/11/2026. Consulte [implementação, testes e limites](docs/interface-contexto-permissoes.md); o [planejamento anterior](docs/planejamento-correcoes-interface.md) permanece como referência.
 
@@ -30,7 +31,7 @@ Java 17, Spring Boot 3.3.13, Spring Security, JDBC/JdbcTemplate, PostgreSQL 16, 
 src/main/java/com/kitchentable/   backend e autorização
 src/main/resources/
   application.yml              configuração por ambiente
-  db/migration/                migrações Flyway V1–V12
+  db/migration/                migrações Flyway V1–V14
   static/                      telas HTML e assets CSS/JavaScript
 src/test/java/                 testes Java e fixtures descartáveis
 scripts/                       smoke automatizado de interface
@@ -47,7 +48,7 @@ Consulte o [guia da estrutura](docs/estrutura-projeto.md), o [índice da documen
 
 Pré-requisitos: Java 17, Maven e Docker Desktop. Para smoke: Node 24 e Chrome instalado. Execute os comandos na raiz do clone.
 
-**Esta feature aplica migrações até V12 ao iniciar. Não execute contra o PostgreSQL operacional.** Use somente um banco local novo explicitamente destinado ao desenvolvimento ou as fixtures descartáveis. Veja [instalação e variáveis](docs/instalacao-local.md) e [compatibilidade das migrações](docs/entrega-2-3.md).
+**Esta feature aplica migrações até V14 ao iniciar. Não execute contra o PostgreSQL operacional.** Use somente um banco local novo explicitamente destinado ao desenvolvimento ou as fixtures descartáveis. Veja [instalação e variáveis](docs/instalacao-local.md) e [compatibilidade das migrações](docs/entrega-2-3.md).
 
 Somente para uma instalação local genuinamente nova, sem conflito de porta/volume com outros bancos:
 
@@ -70,12 +71,12 @@ Com Docker em execução:
 
 ```powershell
 mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.springframework=INFO' verify
-node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs
+node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs
 node scripts/test-interface-browser.mjs
 node scripts/smoke-funcionarios.mjs
 ```
 
-O Maven compila, testa e empacota. A suíte contém **183 testes Java** (143 preservados e 40 novos para mesas/comandas), aprovados com Docker/PostgreSQL descartável na validação local de 18/11/2026, sem testes ignorados. A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
+O Maven compila, testa e empacota. A suíte da Entrega 2.5 contém 220 testes Java aprovados (183 preservados e 37 novos), sem falhas, erros ou ignorados. Os resultados e limites estão em docs/entrega-2-5.md. A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
 
 A expiração automatizada pode ser executada separadamente com `mvn '-Dtest=SessionInactivityIntegrationTest' test`; o prazo reduzido existe somente no teste. O prazo administrativo normal permanece 30 minutos.
 

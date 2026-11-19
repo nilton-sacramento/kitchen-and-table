@@ -41,3 +41,7 @@ O smoke oficial importa smoke-mesas-comandas.mjs, com administração de mesas, 
 Testes puros adicionais: node --test scripts/test-atendimento.mjs. O comando conjunto é node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs. Backend e migrações: MesasComandasPostgresTest em src/test/java/com/kitchentable/comandas, executado pelo mvn verify com PostgreSQL 16 descartável.
 
 Ambiente navegável exclusivamente descartável: após mvn verify, execute node scripts/ambiente-atendimento.mjs. URL aleatória em loopback e arquivo privado de credenciais são informados no terminal. Ctrl+C encerra a fixture criada pelo script. Não usar para migrar o cenário manual anterior.
+
+## Entrega 2.5
+
+Testes puros: node --test scripts/test-cardapio.mjs. O smoke oficial importa smoke-cardapio.mjs e cobre cadastro/edição, preços, estoque, combo, cópia entre duas unidades e consulta por PIN com F5 em desktop/tablet/360px. Evidências privadas permanecem em .tools/browser-artifacts e .tools/entrega-2-5. Não executar a extensão sozinha.
