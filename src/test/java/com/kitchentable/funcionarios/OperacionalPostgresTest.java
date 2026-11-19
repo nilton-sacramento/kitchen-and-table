@@ -75,7 +75,7 @@ class OperacionalPostgresTest {
     @Test void migracoesV8ParaV10PreservamChecksumsECredenciais() throws Exception {
         assertEquals(checksums,jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4','5','6','7','8') ORDER BY installed_rank"));
         assertTrue(ADMIN_HASH.equals(jdbc.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,LEGACY)));
-        assertEquals(14,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL AND success",Integer.class));
+        assertEquals(16,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL AND success",Integer.class));
         assertTrue(jdbc.queryForObject("SELECT version()",String.class).contains("PostgreSQL 16"));
         mvc.perform(get("/api/v1/auth/me").session(adminLogin())).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(owner.toString()));
         assertNull(jdbc.queryForObject("SELECT pin_hash FROM usuarios WHERE id=?",String.class,LEGACY));

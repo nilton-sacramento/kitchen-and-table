@@ -67,6 +67,39 @@ public class AcessoAtendimentoService {
     return new Ator(p.usuarioId(), p.vinculoId(), c.nome());
   }
 
+  public boolean vinculoPossui(UUID unidade, UUID vinculo, String... codigos) {
+    var efetivas = permissoes.operacionais(unidade, vinculo);
+    return !efetivas.isEmpty()
+        && codigos.length > 0
+        && Arrays.stream(codigos)
+            .allMatch(
+                c ->
+                    efetivas.stream()
+                        .anyMatch(e -> e.permissao().codigo().equals(c) && e.efetiva()));
+  }
+
+  public long versaoCredencial(UUID unidade, UUID vinculo) {
+    return repo.jdbc()
+        .queryForObject(
+            "SELECT versao FROM credenciais_operacionais WHERE estabelecimento_id=? AND"
+                + " vinculo_id=?",
+            Long.class,
+            unidade,
+            vinculo);
+  }
+
+  public boolean credencialVigente(UUID unidade, UUID vinculo, long versao) {
+    return !repo.jdbc()
+        .query(
+            "SELECT vinculo_id FROM credenciais_operacionais WHERE estabelecimento_id=? AND"
+                + " vinculo_id=? AND NOT bloqueado AND versao=? FOR SHARE",
+            (r, n) -> r.getObject(1, UUID.class),
+            unidade,
+            vinculo,
+            versao)
+        .isEmpty();
+  }
+
   private ResponseStatusException erro(HttpStatus s, String m) {
     return new ResponseStatusException(s, m);
   }

@@ -45,3 +45,7 @@ Ambiente navegável exclusivamente descartável: após mvn verify, execute node 
 ## Entrega 2.5
 
 Testes puros: node --test scripts/test-cardapio.mjs. O smoke oficial importa smoke-cardapio.mjs e cobre cadastro/edição, preços, estoque, combo, cópia entre duas unidades e consulta por PIN com F5 em desktop/tablet/360px. Evidências privadas permanecem em .tools/browser-artifacts e .tools/entrega-2-5. Não executar a extensão sozinha.
+
+## Entrega 2.6
+
+node --test scripts/test-pedidos.mjs valida centavos, intenção de retentativa e rotas de produção. smoke-pedidos.mjs integra o smoke oficial (não executar isoladamente): cria perfis fictícios cozinha/bar no banco descartável, usa PIN e APIs reais, percorre confirmação/preparo/entrega/decisões. Credenciais ficam somente em memória; capturas locais são ignoradas em .tools. PedidosPostgresTest integra mvn verify.

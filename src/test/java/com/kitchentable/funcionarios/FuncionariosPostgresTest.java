@@ -98,7 +98,7 @@ class FuncionariosPostgresTest {
         assertEquals(LEGACY_HASH,jdbc.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(LEGACY_EMAIL,jdbc.queryForObject("SELECT email FROM usuarios WHERE id=?",String.class,LEGACY_USER));
         assertEquals(0L,jdbc.queryForObject("SELECT versao FROM usuarios_estabelecimentos WHERE id=?",Long.class,LEGACY_LINK));
-        assertEquals(14,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
+        assertEquals(16,jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=true AND version IS NOT NULL",Integer.class));
         assertTrue(jdbc.queryForObject("SELECT version()",String.class).contains("PostgreSQL 16"));
         mvc.perform(get("/api/v1/auth/me").session(login(LEGACY_EMAIL))).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(LEGACY_USER.toString()));
     }
@@ -398,7 +398,10 @@ class FuncionariosPostgresTest {
         var f=create(a,"Multifuncao","ATENDENTE");var p=permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(List.of("COZINHA","BAR"),0L));
         assertEquals(List.of("BAR","COZINHA"),p.adicionais());
         assertEquals(Set.of("ATENDENTE","COZINHA","BAR"),new HashSet<>(efetiva(a,id(f),"PRODUTO_CONSULTAR").herdadaDe()));
-        assertTrue(efetiva(a,id(f),"COZINHA_FILA_CONSULTAR").configurada());assertFalse(efetiva(a,id(f),"COZINHA_FILA_CONSULTAR").efetiva());
+        assertTrue(efetiva(a,id(f),"COZINHA_FILA_CONSULTAR").configurada());assertTrue(efetiva(a,id(f),"COZINHA_FILA_CONSULTAR").efetiva());
+        // Cozinha ja implementada na 2.6; o contrato futuro continua negado mesmo configurado.
+        estado(a,id(f),"ESTOQUE_MOVIMENTAR",PermissoesDtos.Estado.PERMITIR);
+        assertTrue(efetiva(a,id(f),"ESTOQUE_MOVIMENTAR").configurada());assertFalse(efetiva(a,id(f),"ESTOQUE_MOVIMENTAR").efetiva());
     }
     @Test void negarPrevaleceSobreTodasFuncoesERetornoHerdarRestaura() throws Exception {
         var f=create(a,"Pessoa","ATENDENTE");permissoes.adicionais(a,id(f),ownerEmail,new PermissoesDtos.Adicionais(List.of("BAR"),0L));
@@ -553,7 +556,7 @@ class FuncionariosPostgresTest {
         mvc.perform(put(base+"/funcionarios/"+id(f)+"/individuais/PRODUTO_CONSULTAR").session(ownerSession).with(csrf()).contentType("application/json").content("{\"estado\":\"INVENTADO\",\"versao\":0}")).andExpect(status().isBadRequest());
     }
     @Test void catalogoPreservaLegadosSemAutoridadeAutomatica() {
-        var catalog=permissoes.catalogo(a,ownerEmail);assertEquals(60,catalog.size());
+        var catalog=permissoes.catalogo(a,ownerEmail);assertEquals(63,catalog.size());
         for(String c:List.of("FUNCIONARIO_GERENCIAR","PERMISSAO_GERENCIAR"))assertFalse(catalog.stream().filter(p->p.codigo().equals(c)).findFirst().orElseThrow().disponivel());
         assertTrue(permissoes.minhas(a,managerEmail).stream().filter(p->p.permissao().categoria().equals("ADMINISTRATIVA")&&!p.permissao().codigo().equals("ESTABELECIMENTO_VISUALIZAR")).noneMatch(PermissoesDtos.Efetiva::efetiva));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM funcoes_permissoes fp JOIN permissoes p ON p.id=fp.permissao_id WHERE p.categoria='FINANCEIRA'",Integer.class));
@@ -576,7 +579,7 @@ class FuncionariosPostgresTest {
         assertEquals(before,db.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version IN ('1','2','3','4') ORDER BY installed_rank"));
         assertEquals(LEGACY_HASH,db.queryForObject("SELECT senha_hash FROM usuarios WHERE id=?",String.class,user));assertTrue(db.queryForObject("SELECT consultar FROM delegacoes_administrativas WHERE vinculo_id=?",Boolean.class,link));
         assertEquals(0,db.queryForObject("SELECT count(*) FROM limites_gestao_permissoes",Integer.class));
-        assertEquals(14,db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
+        assertEquals(16,db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",Integer.class));
     }
     @Test void falhaAuditoriaTambemReverteAdicionaisELimites() throws Exception {
         var f=create(a,"Pessoa","ATENDENTE");

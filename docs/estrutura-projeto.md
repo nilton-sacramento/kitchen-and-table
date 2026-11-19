@@ -48,3 +48,7 @@ Não foi criado segundo backend, workspace duplicado, árvore alternativa de tes
 ## Onde encontrar instruções
 
 [Instalação](instalacao-local.md), [scripts](../scripts/README.md), [testes](organizacao-testes.md), [contribuição](../CONTRIBUTING.md) e [índice completo](README.md).
+
+## Entrega 2.6
+
+Backend de pedidos em src/main/java/com/kitchentable/pedidos; migrações V15/V16; testes em src/test/java/com/kitchentable/pedidos. Frontend: assets/pedidos.js, pedido-editor.js, pedido-contratos.js, pedido-ui.js e producao.js, integrado ao atendimento existente. Extensão do smoke em scripts/smoke-pedidos.mjs; testes puros em scripts/test-pedidos.mjs. Relatórios privados em .tools/entrega-2-6, ignorados. Consulte [contratos e limites](entrega-2-6.md).

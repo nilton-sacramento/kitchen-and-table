@@ -46,3 +46,5 @@
 ## Materiais que permanecem somente locais
 
 Roteiro, acompanhamento, conciliação T01–T19, relatórios e evidências da etapa 2.3 ficam em tests/manual/etapa-2.3 e são ignorados pelo Git. Credenciais, perfis e estado de execução ficam em .tools. O guia dos testes explica a localização; nenhum relatório privado é anexado ao repositório público.
+
+- [Entrega 2.6 — pedidos, cozinha, bar e entrega](entrega-2-6.md)

@@ -136,9 +136,9 @@ function showPage(id, focus = true, historyMode = 'push') {
   $('page-phase').textContent = mesas ? 'ENTREGA 2.4' : employees ? 'GESTÃO DA EQUIPE' : 'ACESSO INICIAL';
   if (module) {
     $('module-title').textContent = module[1];
-    $('module-description').textContent = id === 'comandas' ? 'As comandas de mesa e balcão estão disponíveis no acesso operacional com identificação e PIN. Pedidos e pagamentos ainda não estão disponíveis.' : module[3];
-    $('operational-link').hidden = id !== 'comandas';
-    $('module-unavailable').hidden = id === 'comandas';
+    $('module-description').textContent = ['comandas','pedidos','cozinha','bar'].includes(id) ? 'Disponível no acesso operacional com identificação e PIN. Utilize comandas para registrar pedidos ou as filas de cozinha e bar conforme suas permissões. Pagamentos ainda não estão disponíveis.' : module[3];
+    $('operational-link').hidden = !['comandas','pedidos','cozinha','bar'].includes(id);
+    $('module-unavailable').hidden = ['comandas','pedidos','cozinha','bar'].includes(id);
     $('module-symbol').textContent = module[2];
   }
   document.querySelectorAll('.nav-button').forEach((button) => {

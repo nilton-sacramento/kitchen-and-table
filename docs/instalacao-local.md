@@ -52,6 +52,8 @@ O .env do Compose não é carregado automaticamente pelo Spring Boot. Não versi
 
 ## Sessões e validação
 
-A autenticação administrativa persiste após F5 por sessão do backend. Reiniciar o servidor encerra sessões em memória. Sair invalida a sessão. Restaurar a seção e a unidade selecionadas e tornar rascunhos elegíveis duráveis continuam melhorias planejadas, separadas da autenticação.
+A autenticação administrativa persiste após F5 por sessão do backend. Reiniciar o servidor encerra sessões em memória. Sair invalida a sessão. A seção e a unidade são restauradas pela URL somente após revalidar o acesso. Rascunhos elegíveis de pessoas usam sessionStorage com escopo/validade; PINs, permissões e novos pedidos não são persistidos. Veja [regras de contexto e rascunhos](interface-contexto-permissoes.md).
 
 Permissões, vínculos e delegações são validados no backend por unidade. O PIN operacional tem suas regras próprias de bloqueio e inatividade; consulte [Entrega 2.3](entrega-2-3.md). Para validação use [os testes](organizacao-testes.md), sem reduzir a configuração normal nem acessar dados operacionais.
+
+Na feature da Entrega 2.6, o startup aplica até V16. Não iniciar contra banco operacional ou banco manual antigo. Use as fixtures de mvn verify e do smoke oficial. [Pedidos e produção](entrega-2-6.md) descreve estoque, decisões e limitações financeiras.

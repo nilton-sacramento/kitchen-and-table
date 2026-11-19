@@ -138,8 +138,17 @@ public class ComandaRepository {
     return Boolean.TRUE.equals(
         jdbc.queryForObject(
             "SELECT EXISTS(SELECT 1 FROM permissoes WHERE disponivel AND codigo IN"
-                + " ('PEDIDO_REGISTRAR','PEDIDO_ENVIAR','PAGAMENTO_REGISTRAR','CAIXA_OPERAR'))",
+                + " ('PAGAMENTO_REGISTRAR','CAIXA_OPERAR'))",
             Boolean.class));
+  }
+
+  public boolean possuiPedidos(UUID unidade, UUID comanda) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM pedidos WHERE estabelecimento_id=? AND comanda_id=?)",
+            Boolean.class,
+            unidade,
+            comanda));
   }
 
   public List<Evento> historico(UUID unidade, UUID id) {

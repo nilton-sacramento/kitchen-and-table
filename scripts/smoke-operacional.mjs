@@ -1,3 +1,4 @@
+import { prepararPedidos, smokePedidos } from './smoke-pedidos.mjs';
 import { prepararCardapio, smokeCardapioOperacional } from './smoke-cardapio.mjs';
 import { prepararMesas, smokeMesasComandas } from './smoke-mesas-comandas.mjs';
 // Extensao do smoke principal: API real, Chrome e PostgreSQL 16 descartavel.
@@ -11,7 +12,8 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   // openPage ainda revalida a sessao e depois descarta o editor recem-aberto.
   await wait("!document.getElementById('app-view').hidden",'administracao pronta para PIN');
   await prepararCardapio({fixture,evaluate,wait,cdp,pause,pass,artifacts,fs,path});
-  await prepararMesas({fixture,targetLink,evaluate,wait,ownerEval,pass});
+  await prepararMesas({fixture,targetLink,evaluate,wait,ownerEval,pass,cdp});
+  const preparedPedidos=await prepararPedidos({fixture,targetLink,ownerEval});
   if(await evaluate("document.getElementById('employee-view').hidden")){
     await evaluate("document.querySelector('[data-page=funcionarios]').click();true");
   }
@@ -44,8 +46,8 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   await evaluate("document.getElementById('logout').click();true");await wait("!document.getElementById('login-view').hidden",'sair da administracao antes do PIN');
   await cdp('Page.navigate',{url:fixture.url+'/operacional.html'});
   await wait("document.getElementById('op-enter') && !document.getElementById('op-enter').disabled",'entrada operacional');
-  async function login(link,pin){
-    await evaluate(`document.getElementById('op-unit').value=${JSON.stringify(fixture.estabelecimentoId)};document.getElementById('op-person').value=${JSON.stringify(link)};document.getElementById('op-pin').value=${JSON.stringify(pin)};document.getElementById('op-form').requestSubmit();true`);
+  async function login(link,pin,unit=fixture.estabelecimentoId){
+    await evaluate(`document.getElementById('op-unit').value=${JSON.stringify(unit)};document.getElementById('op-person').value=${JSON.stringify(link)};document.getElementById('op-pin').value=${JSON.stringify(pin)};document.getElementById('op-form').requestSubmit();true`);
   }
   async function unlocked(name){await wait(`!document.getElementById('op-protected').hidden && document.getElementById('op-protected').textContent.includes(${JSON.stringify(name)})`,'operador validado');if(!await evaluate("document.getElementById('op-pin').value===''") )throw new Error('PIN permaneceu no campo');}
   async function locked(){await wait("document.getElementById('op-protected').hidden && document.getElementById('op-protected').textContent==='' && !document.getElementById('op-locked').hidden",'dados operacionais ocultos');}
@@ -57,6 +59,7 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   await login(targetLink,credential.pin);await unlocked('Funcionario permissoes');
   await smokeMesasComandas({fixture,targetLink,credential,login,cdp,evaluate,wait,pass,pause,artifacts,fs,path});
   await smokeCardapioOperacional({evaluate,wait,cdp,pause,pass,artifacts,fs,path});
+  await smokePedidos({fixture,targetLink,credential,prepared:preparedPedidos,login,evaluate,wait,cdp,pause,pass,artifacts,fs,path});
   for(const [label,width,height] of [['desktop',1366,900],['tablet',768,1024],['mobile',360,800]]){
     await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<500});await pause(100);
     if(!await evaluate('document.documentElement.scrollWidth<=innerWidth+2'))throw new Error(`Operacional transborda em ${label}`);

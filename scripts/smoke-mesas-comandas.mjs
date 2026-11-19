@@ -5,6 +5,7 @@ export async function prepararMesas({
   evaluate,
   wait,
   ownerEval,
+  cdp,
   pass,
 }) {
   const click = (text) =>
@@ -45,7 +46,7 @@ export async function prepararMesas({
     "mesa ativada",
   );
   const hash = await evaluate("location.hash");
-  await evaluate("location.reload();true");
+  await cdp('Page.reload');
   await wait(
     "!document.getElementById('mesas-view').hidden && document.querySelector('#mesas-view .attendance-card')",
     "F5 em mesas",
