@@ -1,3 +1,4 @@
+import { createCardapioScreen } from './cardapio.js';
 import { createMesaScreen } from './mesas.js';
 import { readNavigation, authorizedUnit, navigationHash, createDraftStore } from './interface-contexto.js';
 import { createEmployeeScreen } from './funcionarios.js';
@@ -35,6 +36,8 @@ let loadingEstablishments = false;
 const employeeScreen = createEmployeeScreen({ root: $('employee-view'), api: getApi, getEstablishments: () => establishments, drafts, onExpired: () => logout('Sua sessão expirou. Entre novamente.') });
 
 const mesaScreen = createMesaScreen({ root: $('mesas-view'), api: getApi, onExpired: () => logout('Sua sessão expirou. Entre novamente.') });
+
+const cardapioScreen = createCardapioScreen({root:$('cardapio-view'),api:getApi,getEstablishments:()=>establishments,onExpired:()=>logout('Sua sessão expirou. Entre novamente.')});
 
 class ApiError extends Error {
   constructor(status, detail) { super('Falha na requisição'); this.status = status; this.detail = detail; }
@@ -82,7 +85,7 @@ function showLoginError(message) {
 
 function logout(message = '', notify = true) {
   if (notify) authEvents?.postMessage({ type: 'logout' });
-  employeeScreen.reset(); mesaScreen.reset();
+  employeeScreen.reset(); mesaScreen.reset(); cardapioScreen.reset();
   drafts.clear(); identity = null; restoreAgain = false;
   history.replaceState(null, '', location.pathname + location.search);
   generation++;
@@ -117,6 +120,7 @@ function showPage(id, focus = true, historyMode = 'push') {
   rememberContext(historyMode);
   const module = modules.find((item) => item[0] === id);
   const dashboard = !module;
+  const products=id==='produtos';$('cardapio-view').hidden=!products;if(products)cardapioScreen.activate($('establishment-select').value);else cardapioScreen.reset();
   const employees = id === 'funcionarios';
   const mesas = id === 'mesas';
   $('mesas-view').hidden = !mesas;
@@ -125,7 +129,7 @@ function showPage(id, focus = true, historyMode = 'push') {
   if (employees) employeeScreen.activate($('establishment-select').value);
   else employeeScreen.reset();
   $('dashboard').hidden = !dashboard;
-  $('module-view').hidden = dashboard || employees || mesas;
+  $('module-view').hidden = dashboard || employees || mesas || products;
   $('page-title').textContent = dashboard ? 'Visão geral' : module[1];
   $('breadcrumb').textContent = dashboard ? 'VISÃO GERAL' : module[1].toLocaleUpperCase('pt-BR');
   $('page-description').textContent = dashboard ? 'Seu estabelecimento, no centro da gestão.' : employees ? 'Cadastros e vínculos independentes por unidade.' : 'Um próximo passo na evolução da sua gestão.';
@@ -168,6 +172,7 @@ function selectEstablishment(activate = true) {
   const role = selected ? (roles[selected.funcao] || selected.funcao) : '—';
   $('establishment-role').textContent = selected ? `Sua função: ${role}` : 'Consulte o responsável pelo seu acesso.';
   $('user-role').textContent = role;
+  if(activate&&!$('cardapio-view').hidden)cardapioScreen.activate(selected?.id);
   if (activate && !$('mesas-view').hidden) mesaScreen.activate(selected?.id);
   if (activate && !$('employee-view').hidden) employeeScreen.activate(selected?.id);
 }
@@ -203,7 +208,7 @@ async function loadEstablishments(preferred = requestedContext().unit, activate 
     establishments = [];
     $('establishment-name').textContent = 'Estabelecimentos indisponíveis';
     $('establishment-select').replaceChildren();
-    employeeScreen.reset(); mesaScreen.reset();
+    employeeScreen.reset(); mesaScreen.reset(); cardapioScreen.reset();
     $('data-error-text').textContent = errorMessage(error);
     $('data-error').hidden = false;
     throw error;
@@ -267,7 +272,7 @@ for (const [id, title, icon, description] of [['dashboard', 'Visão geral', '⊞
   if (id !== 'dashboard') {
     const badge = document.createElement('span');
     badge.className = 'coming';
-    badge.textContent = id === 'funcionarios' ? 'Equipe' : id === 'mesas' ? 'Gestão' : 'Em breve';
+    badge.textContent = id === 'funcionarios' ? 'Equipe' : ['mesas','produtos'].includes(id) ? 'Gestão' : 'Em breve';
     button.append(badge);
     const card = document.createElement('button');
     card.type = 'button';
@@ -276,7 +281,7 @@ for (const [id, title, icon, description] of [['dashboard', 'Visão geral', '⊞
     top.className = 'card-top';
     const status = document.createElement('span');
     status.className = 'phase-badge';
-    status.textContent = id === 'funcionarios' ? 'GESTÃO DA EQUIPE' : id === 'mesas' ? 'GESTÃO DE MESAS' : 'EM DESENVOLVIMENTO';
+    status.textContent = id === 'funcionarios' ? 'GESTÃO DA EQUIPE' : id === 'mesas' ? 'GESTÃO DE MESAS' : id === 'produtos' ? 'CARDÁPIO REAL' : 'EM DESENVOLVIMENTO';
     top.append(symbol.cloneNode(true), status);
     const name = document.createElement('strong');
     name.textContent = title;
@@ -303,7 +308,7 @@ $('logout').addEventListener('click', async () => {
   } finally { $('logout').disabled = false; }
 });
 $('retry').addEventListener('click', () => restoreSession());
-$('establishment-select').addEventListener('change', () => { employeeScreen.reset(); mesaScreen.reset(); rememberContext('push'); restoreSession(); });
+$('establishment-select').addEventListener('change', () => { employeeScreen.reset(); mesaScreen.reset(); cardapioScreen.reset(); rememberContext('push'); restoreSession(); });
 $('back-dashboard').addEventListener('click', () => openPage('dashboard'));
 $('show-password').addEventListener('click', () => {
   const showing = $('password').type === 'password';
@@ -357,7 +362,7 @@ async function restoreContext() {
     if (current === generation) { $('login-submit').disabled = false; $('login-status').textContent = ''; }
   }
 }
-window.addEventListener('popstate', () => { employeeScreen.reset(); mesaScreen.reset(); restoreSession(); });
+window.addEventListener('popstate', () => { employeeScreen.reset(); mesaScreen.reset(); cardapioScreen.reset(); restoreSession(); });
 window.addEventListener('hashchange', () => { if (authenticated) restoreSession(); });
 // Conferir a sessão ao voltar a uma aba, sem polling que prolongue a inatividade.
 document.addEventListener('visibilitychange', () => {

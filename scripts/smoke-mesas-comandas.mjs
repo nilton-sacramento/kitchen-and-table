@@ -70,7 +70,8 @@ export async function prepararMesas({
     "!document.getElementById('app-view').hidden && document.querySelector('#mesas-view .attendance-card h3')?.textContent==='Mesa principal'",
     "retorno à unidade A",
   );
-  for (const [target,codes] of [[targetLink,['COMANDA_ENCERRAR','COMANDA_CANCELAR']],[fixture.managerVinculo,['MESA_CONSULTAR','COMANDA_CONSULTAR','COMANDA_ENCERRAR']]]) {
+  // O cenario anterior revoga PRODUTO_CONSULTAR; o proprietario concede explicitamente na fixture antes do fluxo do cardapio.
+  for (const [target,codes] of [[targetLink,['COMANDA_ENCERRAR','COMANDA_CANCELAR','PRODUTO_CONSULTAR']],[fixture.managerVinculo,['MESA_CONSULTAR','COMANDA_CONSULTAR','COMANDA_ENCERRAR']]]) {
     for(const code of codes){
       const result=await ownerEval('(async()=>{const base="/api/v1/estabelecimentos/'+fixture.estabelecimentoId+'/permissoes/funcionarios/'+target+'";const f=await(await fetch(base)).json();const csrf=await(await fetch("/api/v1/auth/csrf")).json();return(await fetch(base+"/individuais/'+code+'",{method:"PUT",headers:{[csrf.headerName]:csrf.token,"Content-Type":"application/json"},body:JSON.stringify({estado:"PERMITIR",versao:f.versao})})).status})()');
       if(result!==200)throw Error('Concessão explícita de teste recusada: HTTP '+result);
