@@ -237,8 +237,7 @@ class MesasComandasPostgresTest {
         j.queryForList(
             "SELECT version,checksum FROM flyway_schema_history WHERE version::int<=10 ORDER BY"
                 + " installed_rank"));
-    assertEquals(
-        12,
+    assertEquals(14,
         j.queryForObject(
             "SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL", Integer.class));
     assertTrue(j.queryForObject("SELECT version()", String.class).contains("PostgreSQL 16"));
