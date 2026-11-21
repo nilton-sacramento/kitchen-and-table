@@ -95,6 +95,7 @@ abstract class FinanceiroPostgresBase {
   @Autowired CardapioService cardapio;
   @Autowired CardapioRepository catalogo;
   @Autowired ComandaService comandas;
+  @Autowired com.kitchentable.mesas.MesaService mesas;
   @Autowired PedidoRegistroService pedidos;
   @Autowired PedidoRepository pedidoRepo;
   @Autowired ProducaoService producao;

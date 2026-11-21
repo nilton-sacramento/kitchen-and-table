@@ -380,12 +380,26 @@ class FinanceiroPostgresTest extends FinanceiroPostgresBase {
   }
 
   @Test
-  void quitacaoPreservaConsumoLiberaComandaEImpedeNovosPedidos() {
+  void quitacaoPreservaConsumoLiberaMesaEImpedeNovosPedidos() {
+    var mesa = mesas.criar(a, admin, new com.kitchentable.mesas.MesaDtos.Criacao("Financeiro 01"));
+    comanda =
+        comandas.abrir(
+            a,
+            waiter,
+            at,
+            UUID.randomUUID(),
+            new com.kitchentable.comandas.ComandaDtos.Abertura(
+                com.kitchentable.comandas.ComandaDtos.Modalidade.MESA, mesa.id(), null));
+    assertEquals("OCUPADA", mesas.buscar(a, mesa.id(), waiter, at).situacao());
     var t = open();
     var p = order();
     deliver(p);
     pay(t, Meio.PIX, 10000);
+    assertEquals("OCUPADA", mesas.buscar(a, mesa.id(), waiter, at).situacao());
     var q = settle(t);
+    var livre = mesas.buscar(a, mesa.id(), waiter, at);
+    assertEquals("LIVRE", livre.situacao());
+    assertNull(livre.comandaAtiva());
     assertEquals(10000, q.pagoCentavos());
     assertTrue(
         j.queryForObject(
