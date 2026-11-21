@@ -1,3 +1,6 @@
+import { createCaixaScreen } from './caixa-operacional.js';
+import { createContaScreen } from './conta.js';
+import { createRelatorioScreen } from './relatorios.js';
 import { createPedidosScreen } from "./pedidos.js";
 import { renderOperationalMenu } from "./cardapio.js";
 // Tela operacional. O header é precondição contra abas antigas, nunca autenticação.
@@ -29,7 +32,7 @@ export function readAttendanceRoute(hash) {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
   const id = p.get("comanda");
   return {
-    page: ["comandas", "cardapio", "cozinha", "bar"].includes(
+    page: ["comandas", "cardapio", "cozinha", "bar", "caixa", "relatorios"].includes(
       p.get("atendimento"),
     )
       ? p.get("atendimento")
@@ -46,7 +49,8 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     version = 0,
     busy = false,
     pending = null,
-    pedidos = null;
+    pedidos = null,
+    financeiro = null;
   const unit = context.estabelecimentoId,
     actor = context.vinculoId;
   const allowed = (code) =>
@@ -61,7 +65,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     node("h2", "Atendimento"),
     node(
       "p",
-      "Mesas, comandas e pedidos da unidade. Encerramento operacional não registra pagamento.",
+      "Mesas, pedidos e contas da unidade. Recebimentos exigem permissões financeiras individuais.",
       "muted",
     ),
     navigation,
@@ -76,7 +80,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
   };
   function fail(e) {
     if (disposed) return;
-    if ([401, 403, 423].includes(e.status)) {
+    if ([401,423].includes(e.status)||(e.status===403&&!e.requerAutorizacao)) {
       destroy();
       onBlocked();
       return;
@@ -106,12 +110,25 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     void render(page, id);
   }
   async function render(page, id) {
+    financeiro?.destroy();
+    financeiro=null;
     pedidos?.destroy();
     pedidos = null;
     const current = ++version;
     content.replaceChildren(node("p", "Consultando atendimento…", "muted"));
     message.hidden = true;
     try {
+      if (page === 'caixa' || page === 'relatorios') {
+        const area=node('section');content.replaceChildren(area);
+        if(page==='caixa') {
+          if(!['CAIXA_OPERAR','CAIXA_ABRIR','CAIXA_HISTORICO_CONSULTAR'].some(allowed)){area.append(node('p','Consulta financeira não autorizada.'));return;}
+          financeiro=createCaixaScreen({root:area,request,allowed,scope:{unidade:unit,ator:actor},onError:fail,isCurrent:()=>!disposed&&current===version});
+        } else {
+          if(!allowed('RELATORIO_FINANCEIRO_CONSULTAR')){area.append(node('p','Relatório não autorizado.'));return;}
+          financeiro=createRelatorioScreen({root:area,request,onError:fail,isCurrent:()=>!disposed&&current===version,employees:allowed('FUNCIONARIO_HISTORICO_FINANCEIRO_CONSULTAR')});
+        }
+        return;
+      }
       if (["cozinha", "bar"].includes(page)) {
         const sector = page.toUpperCase();
         if (!allowed(sector + "_FILA_CONSULTAR")) {
@@ -186,7 +203,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
           node("h3", page === "mesas" ? item.identificacao : item.codigo),
           node(
             "p",
-            states[item.situacao || item.estado] || item.estado,
+            item.estado==='ENCERRADA'&&item.teveConsumo?'Encerrada com quitação':states[item.situacao || item.estado] || item.estado,
             "attendance-state",
           ),
         );
@@ -292,7 +309,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
           " · " +
           (c.modalidade === "MESA" ? "Mesa " + c.mesa : "Balcão"),
       ),
-      node("p", states[c.estado], "attendance-state"),
+      node("p", c.estado==='ENCERRADA'&&c.teveConsumo?'Encerrada com quitação':states[c.estado], "attendance-state"),
     );
     if (c.cliente) card.append(node("p", "Cliente: " + c.cliente));
     card.append(
@@ -344,9 +361,13 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
       node("h3", "Histórico do atendimento"),
       history,
     );
+    if (allowed('CONTA_CONSULTAR')) {
+      const area=node('section','','financial-account');content.insertBefore(area,card.nextSibling);
+      area.append(button('Consultar conta e pagamentos',()=>{financeiro?.destroy();financeiro=createContaScreen({root:area,request,allowed,scope:{unidade:unit,ator:actor,comanda:c.id},onError:fail,isCurrent:()=>!disposed&&current===version});}));
+    }
     if (allowed("PEDIDO_CONSULTAR")) {
       const area = node("section", "", "pedidos-area");
-      content.insertBefore(area, card.nextSibling);
+      content.insertBefore(area, content.querySelector('.financial-account')?.nextSibling || card.nextSibling);
       pedidos = createPedidosScreen({
         root: area,
         request,
@@ -435,6 +456,8 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     ["BAR_FILA_CONSULTAR", "Bar", "bar"],
   ])
     if (allowed(code)) navigation.append(button(label, () => route(page)));
+  if(['CAIXA_OPERAR','CAIXA_ABRIR','CAIXA_HISTORICO_CONSULTAR'].some(allowed))navigation.append(button('Caixa',()=>route('caixa')));
+  if(allowed('RELATORIO_FINANCEIRO_CONSULTAR'))navigation.append(button('Relatórios financeiros',()=>route('relatorios')));
   const r = readAttendanceRoute(location.hash);
   route(r.page, r.id, false);
   return { destroy };

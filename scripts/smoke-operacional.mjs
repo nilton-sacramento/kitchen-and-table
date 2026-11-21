@@ -1,3 +1,4 @@
+import { prepararCaixa, smokeCaixa } from './smoke-caixa.mjs';
 import { prepararPedidos, smokePedidos } from './smoke-pedidos.mjs';
 import { prepararCardapio, smokeCardapioOperacional } from './smoke-cardapio.mjs';
 import { prepararMesas, smokeMesasComandas } from './smoke-mesas-comandas.mjs';
@@ -14,6 +15,7 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   await prepararCardapio({fixture,evaluate,wait,cdp,pause,pass,artifacts,fs,path});
   await prepararMesas({fixture,targetLink,evaluate,wait,ownerEval,pass,cdp});
   const preparedPedidos=await prepararPedidos({fixture,targetLink,ownerEval});
+  const preparedCaixa=await prepararCaixa({fixture,prepared:preparedPedidos,evaluate,wait,pass});
   if(await evaluate("document.getElementById('employee-view').hidden")){
     await evaluate("document.querySelector('[data-page=funcionarios]').click();true");
   }
@@ -60,6 +62,7 @@ export async function smokeOperational({fixture,targetLink,credential,cdp,evalua
   await smokeMesasComandas({fixture,targetLink,credential,login,cdp,evaluate,wait,pass,pause,artifacts,fs,path});
   await smokeCardapioOperacional({evaluate,wait,cdp,pause,pass,artifacts,fs,path});
   await smokePedidos({fixture,targetLink,credential,prepared:preparedPedidos,login,evaluate,wait,cdp,pause,pass,artifacts,fs,path});
+  await smokeCaixa({fixture,targetLink,credential,prepared:preparedPedidos,finance:preparedCaixa,login,evaluate,wait,ownerEval,cdp,pause,pass,artifacts,fs,path});
   for(const [label,width,height] of [['desktop',1366,900],['tablet',768,1024],['mobile',360,800]]){
     await cdp('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<500});await pause(100);
     if(!await evaluate('document.documentElement.scrollWidth<=innerWidth+2'))throw new Error(`Operacional transborda em ${label}`);

@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Transactional
 public class AlteracaoPedidoService {
+  private final com.kitchentable.pagamentos.IntegridadeFinanceiraService financeiro;
   private final PedidoRepository repo;
   private final PedidoRegistroService registro;
   private final AcessoAtendimentoService acesso;
@@ -27,13 +28,15 @@ public class AlteracaoPedidoService {
       AcessoAtendimentoService a,
       EstoqueCardapioService e,
       CardapioRepository c,
-      AuditoriaAdministrativaService ad) {
+      AuditoriaAdministrativaService ad,
+      com.kitchentable.pagamentos.IntegridadeFinanceiraService financeiro) {
     repo = r;
     registro = s;
     acesso = a;
     estoque = e;
     cardapio = c;
     audit = ad;
+    this.financeiro = financeiro;
   }
 
   public Solicitacao solicitar(
@@ -65,7 +68,9 @@ public class AlteracaoPedidoService {
       return repo.solicitacao(u, (UUID) p.get("id"));
     }
     var reference = repo.pedido(u, pedido);
+    financeiro.compartilhar(u);
     repo.bloquearComanda(u, reference.comandaId());
+    financeiro.exigirContaSemLancamentoEfetivo(u, reference.comandaId());
     repo.bloquearPedido(u, pedido);
     var p = repo.pedido(u, pedido);
     if (d.versaoPedido() == null || p.versao() != d.versaoPedido())
@@ -138,7 +143,9 @@ public class AlteracaoPedidoService {
         initial.tipo().equals("CANCELAMENTO") ? "PEDIDO_CANCELAR" : "PEDIDO_ENVIADO_ALTERAR";
     acesso.operador(u, a, esperado, capability);
     var reference = repo.pedido(u, initial.pedidoId());
+    financeiro.compartilhar(u);
     repo.bloquearComanda(u, reference.comandaId());
+    financeiro.exigirContaSemLancamentoEfetivo(u, reference.comandaId());
     repo.bloquearPedido(u, reference.id());
     repo.jdbc()
         .queryForList(

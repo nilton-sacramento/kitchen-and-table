@@ -14,7 +14,7 @@ Dispara em PRs para develop/main e em pushes para main, develop, feature/**, fix
 
 Runner ubuntu-latest, Temurin Java 17, Node 24 e Maven verify: sintaxe JavaScript, compilação, testes e empacotamento. Actions fixadas por SHA completo para segurança da cadeia de dependências; esses SHAs não são commits fixos do produto. Dependabot está preparado para propor atualizações dessas Actions.
 
-Token contents: read; checkout sem persistir credenciais; sem secrets, pull_request_target ou acesso ao banco local/produção. Não imprime ambiente nem publica os relatórios XML de testes. Logs Spring em INFO. A suíte atual contém 137 testes: a base de autenticação usa mocks/Tomcat em loopback e as integrações de funcionários, permissões e PIN usam PostgreSQL 16 descartável via Testcontainers. Não há banco externo ou dado operacional. O smoke obrigatório usa outro banco descartável e Chrome isolado para validar frontend real; veja docs/entrega-2-1.md.
+Token contents: read; checkout sem persistir credenciais; sem secrets, pull_request_target ou acesso ao banco local/produção. Não imprime ambiente nem publica os relatórios XML de testes. Logs Spring em INFO. A suíte preserva os testes anteriores e acrescenta caixa/pagamentos; os totais atuais e resultados estão em [Entrega 2.7](entrega-2-7.md): a base de autenticação usa mocks/Tomcat em loopback e as integrações de funcionários, permissões e PIN usam PostgreSQL 16 descartável via Testcontainers. Não há banco externo ou dado operacional. O smoke obrigatório usa outro banco descartável e Chrome isolado para validar frontend real; veja docs/entrega-2-1.md.
 
 ## Histórico da transição
 
@@ -38,3 +38,7 @@ mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.spr
 Testes não exigem DB_PASSWORD ou banco operacional. Para executar a aplicação, seguir docs/instalacao-local.md somente com ambiente de desenvolvimento autorizado. Não iniciar esta feature contra o banco operacional nem repetir setup ou recriar volumes.
 
 A feature da Entrega 2.3 amplia a validação para PIN e segurança operacional, com migrações até V10 exclusivamente nas fixtures PostgreSQL 16 descartáveis. O smoke principal inclui scripts/smoke-operacional.mjs. O total efetivamente executado e o SHA devem ser conferidos no CI do commit atual; registros históricos de totais menores permanecem nos relatórios das entregas.
+
+## Ampliação da Entrega 2.7
+
+Workflow e template incluem sintaxe dos módulos financeiros, testes Node e smoke real integrado. Timeout de 25 minutos acomoda a suíte ampliada e o Chrome completo, mantendo testes, check obrigatório, permissões mínimas e checkout do SHA exato. Migrações até V19 executam apenas em fixtures descartáveis. Nenhum secret, deploy, merge ou publicação de evidência privada foi adicionado.

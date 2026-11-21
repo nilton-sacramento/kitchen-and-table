@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Transactional
 public class ComandaService {
+  private final com.kitchentable.pagamentos.IntegridadeFinanceiraService financeiro;
   private final ComandaRepository repo;
   private final MesaRepository mesas;
   private final AcessoAtendimentoService acesso;
@@ -25,11 +26,13 @@ public class ComandaService {
       ComandaRepository r,
       MesaRepository m,
       AcessoAtendimentoService a,
-      AuditoriaAdministrativaService audit) {
+      AuditoriaAdministrativaService audit,
+      com.kitchentable.pagamentos.IntegridadeFinanceiraService financeiro) {
     repo = r;
     mesas = m;
     acesso = a;
     this.audit = audit;
+    this.financeiro = financeiro;
   }
 
   public List<Comanda> listar(UUID u, Authentication a, UUID esperado, Estado estado) {
@@ -64,6 +67,7 @@ public class ComandaService {
                 + (cliente == null ? "0:" : "1:" + cliente));
     UUID anterior = repo.repeticao(u, chave, ator.vinculo(), hash);
     if (anterior != null) return repo.buscar(u, anterior, false);
+    financeiro.compartilhar(u);
     if (dto.mesaId() != null) {
       var mesa = mesas.buscar(u, dto.mesaId(), true);
       if (!mesa.ativo() || mesa.comandaAtiva() != null)
@@ -79,6 +83,7 @@ public class ComandaService {
       UUID u, UUID id, Authentication a, UUID esperado, Transicao dto, boolean cancelar) {
     var ator =
         acesso.operador(u, a, esperado, cancelar ? "COMANDA_CANCELAR" : "COMANDA_ENCERRAR", true);
+    financeiro.compartilhar(u);
     var ref = repo.buscar(u, id, false);
     // Mesma ordem da abertura: mesa antes da comanda.
     if (ref.mesaId() != null) mesas.buscar(u, ref.mesaId(), true);
@@ -94,6 +99,7 @@ public class ComandaService {
     if (antes.teveConsumo()
         || antes.possuiPendencias()
         || repo.possuiPedidos(u, id)
+        || repo.possuiLancamentos(u, id)
         || repo.integracaoConsumoHabilitada())
       throw erro(
           HttpStatus.CONFLICT,

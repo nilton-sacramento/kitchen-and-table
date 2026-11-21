@@ -49,3 +49,7 @@ Testes puros: node --test scripts/test-cardapio.mjs. O smoke oficial importa smo
 ## Entrega 2.6
 
 node --test scripts/test-pedidos.mjs valida centavos, intenção de retentativa e rotas de produção. smoke-pedidos.mjs integra o smoke oficial (não executar isoladamente): cria perfis fictícios cozinha/bar no banco descartável, usa PIN e APIs reais, percorre confirmação/preparo/entrega/decisões. Credenciais ficam somente em memória; capturas locais são ignoradas em .tools. PedidosPostgresTest integra mvn verify.
+
+## Entrega 2.7
+
+node --test scripts/test-financeiro.mjs: precisão monetária, escopo, corpo congelado e consulta anterior à retentativa. smoke-caixa.mjs integra o smoke oficial, não execução isolada: PostgreSQL 16/backend reais, política explícita, pedidos 2.6, pagamentos combinados, autorização, resposta perdida, quitação, movimentos e fechamento. Credenciais em memória; capturas/logs privados em .tools. Java integra mvn verify, migrações até V19 só em bancos descartáveis. [Contratos e limites](../docs/entrega-2-7.md).

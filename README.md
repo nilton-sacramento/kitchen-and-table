@@ -4,7 +4,7 @@ SaaS de gestão para restaurantes, bares e lanchonetes, desenvolvido por entrega
 
 ## Situação do desenvolvimento
 
-Etapa 1 e Entregas 2.1–2.4 estão integradas à develop (base 48abeeb). A Entrega 2.5 está publicada no PR #7 Draft para develop. Esta branch implementa a Entrega 2.6 — pedidos, cozinha, bar e entrega — sobre o HEAD validado ff14891 da 2.5, com PR Draft encadeado. Não é uma versão de produção.
+Etapa 1 e Entregas 2.1–2.6 estão integradas à develop, base 28cb33b. Esta feature implementa a Entrega 2.7 — caixa, pagamentos, quitação e relatórios — para revisão em PR Draft com destino develop. Não é uma versão de produção.
 
 Implementado nesta branch (contratos e validações em [Entrega 2.4](docs/entrega-2-4.md)):
 
@@ -17,7 +17,7 @@ Implementado nesta branch (contratos e validações em [Entrega 2.4](docs/entreg
 - Função principal, funções adicionais, exceções individuais, delegações administrativas e auditoria.
 - PIN operacional por vínculo, bloqueio persistente após tentativas incorretas, desbloqueio/redefinição autorizados, inatividade e troca de operador.
 
-Pedidos, filas de cozinha/bar, preparo, entregas e decisões setoriais estão implementados nesta feature 2.6; veja [contratos e limites](docs/entrega-2-6.md). Caixa financeiro e demais módulos futuros continuam indisponíveis. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
+Pedidos, filas de cozinha/bar, preparo, entregas e decisões setoriais implementados; veja [Entrega 2.6](docs/entrega-2-6.md). Caixa, pagamentos e relatórios reais desta feature estão na [Entrega 2.7](docs/entrega-2-7.md). Módulos futuros continuam indisponíveis. Não há cadastro público de proprietários, contratação SaaS ou teste gratuito implementados. O setup técnico é exclusivo da inicialização de um banco genuinamente novo.
 
 Esta branch inclui restauração da seção/unidade, rascunhos elegíveis e organização/prévia de permissões, validados com PostgreSQL descartável em 18/11/2026. Consulte [implementação, testes e limites](docs/interface-contexto-permissoes.md); o [planejamento anterior](docs/planejamento-correcoes-interface.md) permanece como referência.
 
@@ -71,12 +71,12 @@ Com Docker em execução:
 
 ```powershell
 mvn --batch-mode --no-transfer-progress '-Ddebug=false' '-Dlogging.level.org.springframework=INFO' verify
-node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs
+node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs scripts/test-pedidos.mjs scripts/test-financeiro.mjs
 node scripts/test-interface-browser.mjs
 node scripts/smoke-funcionarios.mjs
 ```
 
-O Maven compila, testa e empacota. A suíte desta branch 2.6 contém 276 testes Java aprovados (183 anteriores, 37 de cardápio e 56 de pedidos), sem falhas, erros ou ignorados. Os testes Node somam 32; o Chrome com API controlada mantém 26 verificações, separadas do smoke com backend real. Resultados e limites em [Entrega 2.5](docs/entrega-2-5.md) e [Entrega 2.6](docs/entrega-2-6.md). A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
+O Maven compila, testa e empacota. A suíte desta feature contém 355 testes Java aprovados (276 anteriores e 79 financeiros), sem falhas, erros ou ignorados. Os testes Node somam 42; o Chrome com API controlada mantém 26 verificações, separadas das 46 verificações do smoke com backend real. Resultados, contratos e limites em [Entrega 2.7](docs/entrega-2-7.md). A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
 
 A expiração automatizada pode ser executada separadamente com `mvn '-Dtest=SessionInactivityIntegrationTest' test`; o prazo reduzido existe somente no teste. O prazo administrativo normal permanece 30 minutos.
 

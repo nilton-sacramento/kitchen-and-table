@@ -27,6 +27,7 @@ public class PedidoRegistroService {
       Map<UUID, Integer> consumo,
       Set<String> setores) {}
 
+  private final com.kitchentable.pagamentos.IntegridadeFinanceiraService financeiro;
   private final PedidoRepository repo;
   private final CardapioRepository cardapio;
   private final AcessoAtendimentoService acesso;
@@ -40,13 +41,15 @@ public class PedidoRegistroService {
       AcessoAtendimentoService a,
       EstoqueCardapioService e,
       AuditoriaAdministrativaService ad,
-      ObjectMapper j) {
+      ObjectMapper j,
+      com.kitchentable.pagamentos.IntegridadeFinanceiraService financeiro) {
     repo = r;
     cardapio = c;
     acesso = a;
     estoque = e;
     audit = ad;
     json = j;
+    this.financeiro = financeiro;
   }
 
   String hash(Object value) {
@@ -169,6 +172,7 @@ public class PedidoRegistroService {
     String hash = hash(Arrays.asList(comanda, d));
     UUID old = repo.repeticao(u, key, ator.vinculo(), hash);
     if (old != null) return repo.pedido(u, old);
+    financeiro.compartilhar(u);
     repo.bloquearComanda(u, comanda);
     var prepared = preparar(u, d);
     var result = criar(u, comanda, a, esperado, ator, prepared, null, "PEDIDO_ENVIAR");
