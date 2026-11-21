@@ -4,7 +4,7 @@ SaaS de gestão para restaurantes, bares e lanchonetes, desenvolvido por entrega
 
 ## Situação do desenvolvimento
 
-Etapa 1 e Entregas 2.1–2.6 estão integradas à develop, base 28cb33b. Esta feature implementa a Entrega 2.7 — caixa, pagamentos, quitação e relatórios — para revisão em PR Draft com destino develop. Não é uma versão de produção.
+Etapa 1 e Entregas 2.1–2.7 estão integradas à develop, com a Entrega 2.7 no merge 02edbfb91fea15c0514fed81399c3da09be3aaee. Esta branch de correção valida essa base integrada; não é a Entrega 2.8 nem uma versão de produção.
 
 Implementado nesta branch (contratos e validações em [Entrega 2.4](docs/entrega-2-4.md)):
 
@@ -31,7 +31,7 @@ Java 17, Spring Boot 3.3.13, Spring Security, JDBC/JdbcTemplate, PostgreSQL 16, 
 src/main/java/com/kitchentable/   backend e autorização
 src/main/resources/
   application.yml              configuração por ambiente
-  db/migration/                migrações Flyway V1–V14
+  db/migration/                migrações Flyway V1–V19
   static/                      telas HTML e assets CSS/JavaScript
 src/test/java/                 testes Java e fixtures descartáveis
 scripts/                       smoke automatizado de interface
@@ -48,7 +48,7 @@ Consulte o [guia da estrutura](docs/estrutura-projeto.md), o [índice da documen
 
 Pré-requisitos: Java 17, Maven e Docker Desktop. Para smoke: Node 24 e Chrome instalado. Execute os comandos na raiz do clone.
 
-**Esta feature aplica migrações até V16 ao iniciar. Não execute contra o PostgreSQL operacional.** Use somente um banco local novo explicitamente destinado ao desenvolvimento ou as fixtures descartáveis. Veja [instalação e variáveis](docs/instalacao-local.md) e [compatibilidade das migrações](docs/entrega-2-3.md).
+**A aplicação aplica migrações até V19 ao iniciar. Não execute contra o PostgreSQL operacional.** Use somente um banco local novo explicitamente destinado ao desenvolvimento ou as fixtures descartáveis. Veja [instalação e variáveis](docs/instalacao-local.md) e [compatibilidade das migrações](docs/entrega-2-3.md).
 
 Somente para uma instalação local genuinamente nova, sem conflito de porta/volume com outros bancos:
 
@@ -76,7 +76,7 @@ node scripts/test-interface-browser.mjs
 node scripts/smoke-funcionarios.mjs
 ```
 
-O Maven compila, testa e empacota. A suíte desta feature contém 355 testes Java aprovados (276 anteriores e 79 financeiros), sem falhas, erros ou ignorados. Os testes Node somam 42; o Chrome com API controlada mantém 26 verificações, separadas das 46 verificações do smoke com backend real. Resultados, contratos e limites em [Entrega 2.7](docs/entrega-2-7.md). A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
+O Maven compila, testa e empacota. A suíte atual contém 355 testes Java aprovados (276 anteriores e 79 financeiros), sem falhas, erros ou ignorados. Os testes Node somam 42; o Chrome com API controlada mantém 26 verificações, separadas das 46 verificações do smoke com backend real. Resultados, contratos e limites em [Entrega 2.7](docs/entrega-2-7.md). A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
 
 A expiração automatizada pode ser executada separadamente com `mvn '-Dtest=SessionInactivityIntegrationTest' test`; o prazo reduzido existe somente no teste. O prazo administrativo normal permanece 30 minutos.
 
