@@ -25,8 +25,8 @@ if(document.getElementById('operational-root')){
   async function api(path,method='GET',body,extraHeaders={}){
     const started=performance.now();const headers={...extraHeaders};if(method!=='GET'){const c=await(await fetch('/api/v1/auth/csrf',{credentials:'same-origin',cache:'no-store'})).json();headers[c.headerName]=c.token;if(body)headers['Content-Type']='application/json';}
     const response=await fetch(`/api/v1/${path}`,{method,credentials:'same-origin',cache:'no-store',headers,...(body?{body:JSON.stringify(body)}:{})});
-    if(!response.ok){const e=new Error(response.status===401?'Não foi possível desbloquear. Confira os dados ou procure o responsável.':'Não foi possível confirmar a operação. Tente novamente ou procure o responsável.');if(path.includes('/estabelecimentos/')){try{const problem=await response.json();if(typeof problem.detail==='string')e.message=problem.detail;}catch{}}e.status=response.status;throw e;}
-    if(response.status===204)return null;const result=await response.json();
+    if(!response.ok){const e=new Error(response.status===401?'Não foi possível desbloquear. Confira os dados ou procure o responsável.':'Não foi possível confirmar a operação. Tente novamente ou procure o responsável.');if(path.includes('/estabelecimentos/')){try{const problem=await response.json();if(typeof problem.detail==='string')e.message=problem.detail;e.requerAutorizacao=problem.requerAutorizacao===true;}catch{}}e.status=response.status;throw e;}
+    if(response.status===204)return null;const responseText=await response.text();const result=responseText?JSON.parse(responseText):null;
     const c=result?.contexto||(typeof result?.validadeMs==='number'?result:null);
     if(c)c.validadeMs=Math.max(0,c.validadeMs-(performance.now()-started));
     return result;
@@ -41,7 +41,7 @@ if(document.getElementById('operational-root')){
     const unchanged=unlocked&&context&&context.vinculoId===c.vinculoId&&context.estabelecimentoId===c.estabelecimentoId&&context.nome===c.nome&&context.estabelecimento===c.estabelecimento&&JSON.stringify(context.permissoes)===JSON.stringify(c.permissoes);
     if(unchanged){context=c;schedule(c);return;}
     atendimento?.destroy();atendimento=null;const key=`${c.estabelecimentoId}:${c.vinculoId}`;drafts.bind(key);context=c;unlocked=true;schedule(c);$('op-error').hidden=true;$('op-locked').hidden=true;$('op-protected').hidden=false;$('op-protected').replaceChildren();
-    $('op-protected').append(el('h2','Acesso desbloqueado'),el('strong',c.nome),el('p',c.estabelecimento,'muted'),el('p','Sua identidade está validada no servidor. Utilize as operações autorizadas abaixo. Pagamentos e caixa financeiro ainda não estão disponíveis.','muted small'));
+    $('op-protected').append(el('h2','Acesso desbloqueado'),el('strong',c.nome),el('p',c.estabelecimento,'muted'),el('p','Sua identidade está validada no servidor. Utilize as operações autorizadas abaixo. Use Caixa e as contas das comandas conforme suas permissões individuais.','muted small'));
     const allowed=c.permissoes.filter(p=>p.permissao.disponivel&&p.efetiva);const capabilities=el('details','','operational-capabilities');capabilities.append(el('summary',`Suas permissões operacionais (${allowed.length})`),el('p',allowed.length?allowed.map(p=>p.permissao.nome).join(', '):'Nenhuma operação está autorizada.'));$('op-protected').append(capabilities);
     for(const [label,action] of [['Bloquear agora',()=>lock()],['Trocar operador',()=>lock(true)]]){const b=el('button',label,'secondary');b.type='button';b.addEventListener('click',action);$('op-protected').append(b);}
     const area=el('section','','attendance-area');$('op-protected').append(area);atendimento=createAtendimentoScreen({root:area,context:c,api,onBlocked:()=>mask('Acesso alterado ou bloqueado. Informe o PIN para revalidar suas permissões.')});

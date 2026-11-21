@@ -13,7 +13,7 @@ test("rota restaura comandas e identificador sem conter credenciais", () => {
   );
 });
 test("rota desconhecida volta a mesas", () =>
-  assert.deepEqual(readAttendanceRoute("#atendimento=caixa&comanda=foo"), {
+  assert.deepEqual(readAttendanceRoute("#atendimento=estoque&comanda=foo"), {
     page: "mesas",
     id: null,
   }));
