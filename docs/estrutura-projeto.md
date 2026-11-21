@@ -52,3 +52,7 @@ Não foi criado segundo backend, workspace duplicado, árvore alternativa de tes
 ## Entrega 2.6
 
 Backend de pedidos em src/main/java/com/kitchentable/pedidos; migrações V15/V16; testes em src/test/java/com/kitchentable/pedidos. Frontend: assets/pedidos.js, pedido-editor.js, pedido-contratos.js, pedido-ui.js e producao.js, integrado ao atendimento existente. Extensão do smoke em scripts/smoke-pedidos.mjs; testes puros em scripts/test-pedidos.mjs. Relatórios privados em .tools/entrega-2-6, ignorados. Consulte [contratos e limites](entrega-2-6.md).
+
+## Entrega 2.7
+
+Caixa, pagamentos e relatórios nos pacotes Java caixa, pagamentos e relatorios; migrações novas V17–V19, V1–V16 preservadas. Frontend modular financeiro.js, financeiro-ui.js, caixa-operacional.js, conta.js, caixa-admin.js e relatorios.js na pasta existente de assets. Java em src/test/java/com/kitchentable/caixa; Node/Chrome em scripts/test-financeiro.mjs e scripts/smoke-caixa.mjs. [Entrega 2.7](entrega-2-7.md). Sem estrutura paralela ou dado privado versionado.

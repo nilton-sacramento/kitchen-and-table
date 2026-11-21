@@ -18,7 +18,7 @@ jobs:
   build:
     name: Java 17 e JavaScript
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout do commit exato do evento
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,7 +60,18 @@ jobs:
           node --check src/main/resources/static/assets/operacional.js
           node --check src/main/resources/static/assets/seguranca-operacional.js
           node --check scripts/smoke-operacional.mjs
+          node --check src/main/resources/static/assets/financeiro.js
+          node --check src/main/resources/static/assets/financeiro-ui.js
+          node --check src/main/resources/static/assets/conta.js
+          node --check src/main/resources/static/assets/caixa-operacional.js
+          node --check src/main/resources/static/assets/caixa-admin.js
+          node --check src/main/resources/static/assets/relatorios.js
+          node --check scripts/smoke-caixa.mjs
+          node --check scripts/test-financeiro.mjs
           node --check scripts/smoke-funcionarios.mjs
+
+      - name: Testes de contexto e rascunhos
+        run: node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs scripts/test-pedidos.mjs scripts/test-financeiro.mjs
 
       - name: Compilacao, testes e empacotamento
         run: mvn --batch-mode --no-transfer-progress -Ddebug=false -Dlogging.level.org.springframework=INFO verify

@@ -29,6 +29,7 @@ let chrome, socket;
 const profile = path.join(tools, `chrome-test-${crypto.randomUUID()}`);
 let sequence = 0;
 const pending = new Map();
+const httpFailures=[];
 function sendCdp(method, params = {}) {
   return new Promise((resolve, reject) => {
     const id = ++sequence;
@@ -59,6 +60,7 @@ async function wait(expression, description) {
   }
   const diagnostic = await evaluate("({appHidden:document.getElementById('app-view')?.hidden,loginError:document.getElementById('login-error')?.textContent,employeeMessage:document.querySelector('[data-message]')?.textContent,busy:document.getElementById('employee-view')?.getAttribute('aria-busy'),ready:document.readyState,operationalHidden:document.getElementById('op-protected')?.hidden,operationalError:document.getElementById('op-error')?.textContent,operationalState:document.getElementById('op-state')?.textContent,attendance:document.querySelector('.attendance-area')?.textContent.slice(-1200),route:location.hash})").catch(() => ({}));
   console.log('DIAGNOSTIC:', JSON.stringify(diagnostic));
+  console.log('HTTP_DIAGNOSTIC:', JSON.stringify(httpFailures));
   throw new Error(`Tempo esgotado: ${description}`);
 }
 async function press(key, code, windowsVirtualKeyCode) {
@@ -93,6 +95,7 @@ try {
   await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = () => reject(new Error('Falha na conexão com Chrome.')); });
   socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
+    if(data.method==='Network.responseReceived'&&data.params.response.status>=400){const r=data.params.response;const pathname=new URL(r.url).pathname.replace(/[a-f0-9]{8}-[a-f0-9-]{27,}/gi,'[id]');httpFailures.push({status:r.status,path:pathname});if(httpFailures.length>20)httpFailures.shift();}
     if (data.method === 'Runtime.exceptionThrown') {
       const error = data.params.exceptionDetails.exception;
       const safe = String(error?.description || data.params.exceptionDetails.text).split('\n')[0].replaceAll(credential.email, '[fixture]').replaceAll(credential.password, '[fixture]').replaceAll(credential.managerEmail, '[fixture]').replaceAll(credential.managerPassword, '[fixture]').replaceAll(credential.pin, '[fixture]').replaceAll(credential.secondPin, '[fixture]');
@@ -102,7 +105,7 @@ try {
     clearTimeout(item.timer); pending.delete(data.id);
     if (data.error) item.reject(new Error('Comando do navegador rejeitado.')); else item.resolve(data.result);
   };
-  await cdp('Page.enable'); await cdp('Runtime.enable');
+  await cdp('Page.enable'); await cdp('Runtime.enable'); await cdp('Network.enable');
   await cdp('Page.addScriptToEvaluateOnNewDocument', { source: 'window.confirm=()=>true;' });
   await cdp('Page.navigate', { url: fixture.url });
   await wait("document.getElementById('login-submit') && !document.getElementById('login-submit').disabled", 'formulário de login');
