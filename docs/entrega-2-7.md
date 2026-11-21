@@ -61,7 +61,7 @@ Requisitos em README/CONTRIBUTING. Não iniciar com datasource operacional.
 3. node scripts/smoke-funcionarios.mjs depois de Maven. Fixture Spring Boot/PG16 e Chrome próprios, credenciais sintéticas em memória; capturas ignoradas em .tools/browser-artifacts. Não executar smoke-caixa isoladamente.
 4. Ambiente manual somente descartável conforme scripts/README.md. Proprietário configura política e concede permissões individuais antes do acesso por PIN.
 
-Validação local final em 21/11/2026: Maven verify com 355 testes aprovados, sem falhas, erros ou ignorados; 42 testes Node; 45 verificações Chrome com backend real; 26 verificações Chrome com API controlada. Compilação, empacotamento, sintaxe e actionlint aprovados. O CI deve ser conferido no SHA da PR publicada. Automação não equivale à aprovação manual do proprietário/piloto.
+Validação local final em 21/11/2026: Maven verify com 355 testes aprovados, sem falhas, erros ou ignorados; 42 testes Node; 46 verificações Chrome com backend real; 26 verificações Chrome com API controlada. Compilação, empacotamento, sintaxe e actionlint aprovados. O CI deve ser conferido no SHA da PR publicada. Automação não equivale à aprovação manual do proprietário/piloto.
 
 ## Limitações e piloto
 

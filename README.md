@@ -76,7 +76,7 @@ node scripts/test-interface-browser.mjs
 node scripts/smoke-funcionarios.mjs
 ```
 
-O Maven compila, testa e empacota. A suíte desta feature contém 355 testes Java aprovados (276 anteriores e 79 financeiros), sem falhas, erros ou ignorados. Os testes Node somam 42; o Chrome com API controlada mantém 26 verificações, separadas das 45 verificações do smoke com backend real. Resultados, contratos e limites em [Entrega 2.7](docs/entrega-2-7.md). A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
+O Maven compila, testa e empacota. A suíte desta feature contém 355 testes Java aprovados (276 anteriores e 79 financeiros), sem falhas, erros ou ignorados. Os testes Node somam 42; o Chrome com API controlada mantém 26 verificações, separadas das 46 verificações do smoke com backend real. Resultados, contratos e limites em [Entrega 2.7](docs/entrega-2-7.md). A suíte inclui mocks, Tomcat temporário e PostgreSQL 16 descartável via Testcontainers. O smoke inclui a extensão operacional e inicia outra fixture com banco, navegador e credenciais sintéticas próprios. Não usa o PostgreSQL operacional nem precisa de `DB_PASSWORD`.
 
 A expiração automatizada pode ser executada separadamente com `mvn '-Dtest=SessionInactivityIntegrationTest' test`; o prazo reduzido existe somente no teste. O prazo administrativo normal permanece 30 minutos.
 
