@@ -1,5 +1,7 @@
 # Instalação local e variáveis
 
+**Feature Entrega2.8:** o código atual inicia migrações atéV23. Não iniciar contra banco operacional ou a demonstração2.7 existente. Para validar, use exclusivamente as fixtures PostgreSQL16 descartáveis. O JAR privado da demonstração continua fixo na base2.7 e não deve ser substituído. [Contratos2.8](entrega-2-8.md). As referências de versões anteriores abaixo descrevem os ambientes históricos.
+
 Guia da implementação local da Entrega 2.4. Java 17/Spring Boot, Maven, JDBC/JdbcTemplate, Flyway, PostgreSQL 16 e frontend HTML/CSS/JavaScript servido pelo backend. Etapa 1 e Entregas 2.1/2.2/2.3 estão integradas à develop; a Entrega 2.4 está em validação local. Veja o [estado atual](../README.md).
 
 ## Escolher o ambiente antes de iniciar

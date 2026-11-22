@@ -53,3 +53,9 @@ node --test scripts/test-pedidos.mjs valida centavos, intenção de retentativa 
 ## Entrega 2.7
 
 node --test scripts/test-financeiro.mjs: precisão monetária, escopo, corpo congelado e consulta anterior à retentativa. smoke-caixa.mjs integra o smoke oficial, não execução isolada: PostgreSQL 16/backend reais, política explícita, pedidos 2.6, pagamentos combinados, autorização, resposta perdida, quitação, movimentos e fechamento. Credenciais em memória; capturas/logs privados em .tools. Java integra mvn verify, migrações até V19 só em bancos descartáveis. [Contratos e limites](../docs/entrega-2-7.md).
+
+## Entrega 2.8
+
+node --test scripts/test-externos.mjs valida intenção congelada, consulta antes de retentativa, precisão monetária e rotas delivery/venda rápida. O comando conjunto do CI acrescenta esse arquivo aos cinco anteriores.
+
+smoke-funcionarios.mjs importa smoke-externos.mjs com backend/PostgreSQL16/Chrome reais. Não executar a extensão isoladamente. Capturas passam a usar uma subpasta única por execução em .tools/browser-artifacts, preservando as anteriores. Credenciais sintéticas permanecem somente em memória, sem dependência da demonstração privada. Novas migrações V20–V23 somente em bancos descartáveis; consulte docs/entrega-2-8.md.
