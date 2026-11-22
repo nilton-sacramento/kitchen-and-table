@@ -243,9 +243,7 @@ class CardapioPostgresTest {
         j.queryForList(
             "SELECT version,checksum FROM flyway_schema_history WHERE version::int<=12 ORDER BY"
                 + " installed_rank"));
-    assertEquals(19,
-        j.queryForObject(
-            "SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL", Integer.class));
+    assertEquals(23, j.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL", Integer.class));
     assertTrue(j.queryForObject("SELECT version()", String.class).contains("PostgreSQL 16"));
     mvc.perform(
             post("/api/v1/auth/login")

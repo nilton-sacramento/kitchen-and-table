@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RestControllerAdvice(
     assignableTypes = {
       MesaController.class,
+      com.kitchentable.externos.ExternoController.class,
       ComandaController.class,
       com.kitchentable.cardapio.CardapioController.class,
       com.kitchentable.cardapio.CopiaCardapioController.class,
@@ -26,6 +27,7 @@ public class AtendimentoExceptionHandler {
 
   @ExceptionHandler({
     DataIntegrityViolationException.class,
+    ArithmeticException.class,
     org.springframework.dao.ConcurrencyFailureException.class
   })
   public ResponseEntity<ProblemDetail> conflito() {
@@ -40,6 +42,7 @@ public class AtendimentoExceptionHandler {
     org.springframework.web.bind.MethodArgumentNotValidException.class,
     org.springframework.http.converter.HttpMessageNotReadableException.class,
     org.springframework.web.bind.MissingRequestHeaderException.class,
+    org.springframework.web.bind.MissingServletRequestParameterException.class,
     org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class
   })
   public ResponseEntity<ProblemDetail> formato() {

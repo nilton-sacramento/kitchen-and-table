@@ -70,6 +70,17 @@ public class AlteracaoPedidoService {
     var reference = repo.pedido(u, pedido);
     financeiro.compartilhar(u);
     repo.bloquearComanda(u, reference.comandaId());
+    if (!repo.jdbc()
+        .queryForList(
+            "SELECT comanda_id FROM atendimentos_externos WHERE estabelecimento_id=? AND"
+                + " comanda_id=? AND estado<>'REGISTRADO'",
+            u,
+            reference.comandaId())
+        .isEmpty())
+      throw erro(
+          409,
+          "Atendimento despachado ou concluido: retorno ou correcao exige regularizacao especifica,"
+              + " sem cancelamento silencioso");
     financeiro.exigirContaSemLancamentoEfetivo(u, reference.comandaId());
     repo.bloquearPedido(u, pedido);
     var p = repo.pedido(u, pedido);

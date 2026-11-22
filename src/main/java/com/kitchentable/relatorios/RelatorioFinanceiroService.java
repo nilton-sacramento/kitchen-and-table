@@ -240,6 +240,26 @@ public class RelatorioFinanceiroService {
     result.put("detalhesFuncionariosPermitidos", details);
     result.put("vendasLiquidadasCentavos", Long.toString(Dinheiro.exato(sales.get("total"))));
     result.put("comandasLiquidadas", Dinheiro.exato(sales.get("quantidade")));
+    result.put(
+        "canais",
+        repo.jdbc()
+            .query(
+                "SELECT COALESCE(e.tipo,'COMANDA') AS canal,count(*) AS"
+                    + " quantidade,sum(q.consumo_centavos-q.desconto_centavos)::text AS total FROM"
+                    + " quitacoes_comanda q LEFT JOIN atendimentos_externos e ON"
+                    + " e.comanda_id=q.comanda_id AND e.estabelecimento_id=q.estabelecimento_id"
+                    + " WHERE q.estabelecimento_id=? AND q.criado_em>=? AND q.criado_em<?"
+                    + (funcionario == null ? "" : " AND q.executor=?")
+                    + " GROUP BY COALESCE(e.tipo,'COMANDA') ORDER BY canal",
+                (r, n) ->
+                    Map.of(
+                        "canal",
+                        r.getString(1),
+                        "quantidade",
+                        r.getLong(2),
+                        "vendasLiquidadasCentavos",
+                        r.getString(3)),
+                args.toArray()));
     result.put("meios", methods);
     result.put("descontosLiquidosCentavos", Long.toString(discount));
     result.put("sangriasCentavos", Long.toString(sangria));
