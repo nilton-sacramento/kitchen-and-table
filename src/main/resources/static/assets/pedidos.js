@@ -10,6 +10,7 @@ export function createPedidosScreen({
   allowed,
   onError,
   isCurrent = () => true,
+  allowNewOrders = true,
 }) {
   let disposed = false,
     busy = false,
@@ -61,7 +62,7 @@ export function createPedidosScreen({
         button("Atualizar pedidos", () => comanda(c)),
       );
       if (
-        c.estado === "ABERTA" &&
+        allowNewOrders && c.estado === "ABERTA" &&
         allowed("PEDIDO_REGISTRAR") &&
         allowed("PEDIDO_ENVIAR")
       )

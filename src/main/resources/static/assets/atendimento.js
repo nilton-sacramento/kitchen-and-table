@@ -1,3 +1,4 @@
+import { createExternoScreen } from './externos.js';
 import { createCaixaScreen } from './caixa-operacional.js';
 import { createContaScreen } from './conta.js';
 import { createRelatorioScreen } from './relatorios.js';
@@ -32,7 +33,7 @@ export function readAttendanceRoute(hash) {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
   const id = p.get("comanda");
   return {
-    page: ["comandas", "cardapio", "cozinha", "bar", "caixa", "relatorios"].includes(
+    page: ["comandas", "cardapio", "cozinha", "bar", "caixa", "relatorios", "delivery", "venda-rapida"].includes(
       p.get("atendimento"),
     )
       ? p.get("atendimento")
@@ -118,6 +119,12 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     content.replaceChildren(node("p", "Consultando atendimento…", "muted"));
     message.hidden = true;
     try {
+      if (page === 'delivery' || page === 'venda-rapida') {
+        const area=node('section');content.replaceChildren(area);
+        financeiro=createExternoScreen({root:area,request,allowed,scope:{unidade:unit,ator:actor},tipo:page==='delivery'?'DELIVERY':'VENDA_RAPIDA',isCurrent:()=>!disposed&&current===version,onError:fail,onNavigate:route});
+        if(id) await financeiro.detail(id); else await financeiro.list();
+        return;
+      }
       if (page === 'caixa' || page === 'relatorios') {
         const area=node('section');content.replaceChildren(area);
         if(page==='caixa') {
@@ -440,6 +447,7 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
   window.addEventListener("popstate", navigate);
   window.addEventListener("hashchange", navigate);
   function destroy() {
+    financeiro?.destroy();
     pedidos?.destroy();
     pedidos = null;
     disposed = true;
@@ -458,6 +466,8 @@ export function createAtendimentoScreen({ root, context, api, onBlocked }) {
     if (allowed(code)) navigation.append(button(label, () => route(page)));
   if(['CAIXA_OPERAR','CAIXA_ABRIR','CAIXA_HISTORICO_CONSULTAR'].some(allowed))navigation.append(button('Caixa',()=>route('caixa')));
   if(allowed('RELATORIO_FINANCEIRO_CONSULTAR'))navigation.append(button('Relatórios financeiros',()=>route('relatorios')));
+  if(allowed('DELIVERY_CONSULTAR'))navigation.append(button('Delivery',()=>route('delivery')));
+  if(allowed('VENDA_RAPIDA_CONSULTAR'))navigation.append(button('Venda rápida',()=>route('venda-rapida')));
   const r = readAttendanceRoute(location.hash);
   route(r.page, r.id, false);
   return { destroy };
