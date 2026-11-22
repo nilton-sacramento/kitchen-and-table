@@ -74,6 +74,10 @@ jobs:
           node --check src/main/resources/static/assets/caixa-operacional.js
           node --check src/main/resources/static/assets/caixa-admin.js
           node --check src/main/resources/static/assets/relatorios.js
+          node --check src/main/resources/static/assets/externos.js
+          node --check src/main/resources/static/assets/externo-contratos.js
+          node --check scripts/smoke-externos.mjs
+          node --check scripts/test-externos.mjs
           node --check scripts/smoke-caixa.mjs
           node --check scripts/test-financeiro.mjs
           node --check scripts/smoke-pedidos.mjs
@@ -83,7 +87,7 @@ jobs:
           node --check scripts/smoke-funcionarios.mjs
 
       - name: Testes de contexto e rascunhos
-        run: node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs scripts/test-pedidos.mjs scripts/test-financeiro.mjs
+        run: node --test scripts/test-interface-contexto.mjs scripts/test-atendimento.mjs scripts/test-cardapio.mjs scripts/test-pedidos.mjs scripts/test-financeiro.mjs scripts/test-externos.mjs
 
       - name: Compilacao, testes e empacotamento
         run: mvn --batch-mode --no-transfer-progress -Ddebug=false -Dlogging.level.org.springframework=INFO verify
