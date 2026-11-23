@@ -84,7 +84,7 @@ public class SecurityConfig {
                 .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/app.css", "/assets/app.js", "/assets/cardapio.js", "/assets/pedidos.js", "/assets/pedido-editor.js", "/assets/pedido-contratos.js", "/assets/pedido-ui.js", "/assets/producao.js", "/assets/mesas.js", "/assets/atendimento.js",
-                                "/assets/financeiro.js", "/assets/financeiro-ui.js", "/assets/conta.js", "/assets/caixa-operacional.js", "/assets/caixa-admin.js", "/assets/relatorios.js", "/assets/interface-contexto.js", "/assets/funcionarios.js", "/assets/permissoes.js", "/assets/seguranca-operacional.js", "/assets/operacional.js", "/operacional.html").permitAll()
+                                "/assets/externos.js", "/assets/externo-contratos.js", "/assets/financeiro.js", "/assets/financeiro-ui.js", "/assets/conta.js", "/assets/caixa-operacional.js", "/assets/caixa-admin.js", "/assets/relatorios.js", "/assets/interface-contexto.js", "/assets/funcionarios.js", "/assets/permissoes.js", "/assets/seguranca-operacional.js", "/assets/operacional.js", "/operacional.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/health").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/setup/proprietario").permitAll()

@@ -307,6 +307,15 @@ public class PagamentoService {
               + " encerrar");
     if (account.lancamentos().stream().anyMatch(Lancamento::confirmacaoExternaPendente))
       throw erro(409, "Confirme a devolucao externa dos estornos pendentes antes de encerrar");
+    if (!caixa
+        .jdbc()
+        .queryForList(
+            "SELECT comanda_id FROM atendimentos_externos WHERE estabelecimento_id=? AND"
+                + " comanda_id=? AND estado NOT IN ('ENTREGUE','RETIRADO','CANCELADO')",
+            u,
+            comanda)
+        .isEmpty())
+      throw erro(409, "Conclua a entrega ou retirada do atendimento antes da quitacao financeira");
     UUID id = UUID.randomUUID();
     caixa
         .jdbc()

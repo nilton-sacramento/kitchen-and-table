@@ -1,3 +1,4 @@
+import { smokeExternos } from './smoke-externos.mjs';
 // Smoke local com Chrome instalado e fixture Java/PostgreSQL descartavel. Sem dependencias npm.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -7,7 +8,7 @@ import readline from 'node:readline';
 import { smokeOperational } from './smoke-operacional.mjs';
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const tools = path.resolve('.tools');
-const artifacts = path.join(tools, 'browser-artifacts');
+const artifacts = path.join(tools, 'browser-artifacts', 'smoke-' + new Date().toISOString().replaceAll(':','-') + '-' + crypto.randomUUID());
 await fs.mkdir(artifacts, { recursive: true });
 const report = await fs.readFile('target/surefire-reports/TEST-com.kitchentable.funcionarios.FuncionariosPostgresTest.xml', 'utf8');
 const rawClasspath = report.match(/<property name="java.class.path" value="([^"]+)"/u)?.[1];
@@ -287,6 +288,7 @@ try {
   await evaluate(`(async()=>{const c=await(await fetch('/api/v1/auth/csrf')).json();await fetch('/api/v1/auth/logout',{method:'POST',headers:{[c.headerName]:c.token}});const fresh=await(await fetch('/api/v1/auth/csrf')).json();return(await fetch('/api/v1/auth/login',{method:'POST',headers:{[fresh.headerName]:fresh.token},body:new URLSearchParams({email:${JSON.stringify(credential.email)},password:${JSON.stringify(credential.password)}})})).status})()`);
   await cdp('Page.reload');await wait("!!document.getElementById('app-view') && !document.getElementById('app-view').hidden",'retorno ao proprietario');
   await smokeOperational({fixture,targetLink,credential,cdp,evaluate,wait,press,pause,pass,ownerEval,artifacts,fs,path});
+  await smokeExternos({fixture,credential,cdp,evaluate,wait,pause,pass,ownerEval,artifacts,fs,path});
   ownerSocket.close();await browserCommand('Target.disposeBrowserContext',{browserContextId:context.browserContextId});
   await evaluate("document.getElementById('logout').click();true");
   await wait("document.getElementById('app-view').hidden && !document.getElementById('login-view').hidden", 'logout');

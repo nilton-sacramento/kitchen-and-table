@@ -50,3 +50,7 @@ Roteiro, acompanhamento, conciliação T01–T19, relatórios e evidências da e
 - [Entrega 2.6 — pedidos, cozinha, bar e entrega](entrega-2-6.md)
 
 - [Entrega 2.7 — caixa, pagamentos, quitação e relatórios](entrega-2-7.md)
+
+## Entrega 2.8
+
+[Delivery manual e venda rápida](entrega-2-8.md): contratos, integração com pedidos/produção/caixa, logística independente, permissões, migrações V20–V23 e limites. Feature em validação, sem merge/deploy ou homologação humana presumidos. A PR10 documental permanece independente.

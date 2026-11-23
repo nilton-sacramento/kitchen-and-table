@@ -41,11 +41,11 @@ class FinanceiroMigrationTest {
           new JdbcTemplate(
               new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword()));
       assertEquals(
-          19,
+          23,
           j.queryForObject(
               "SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL",
               Integer.class));
-      assertEquals(68, j.queryForObject("SELECT count(*) FROM permissoes", Integer.class));
+      assertEquals(73, j.queryForObject("SELECT count(*) FROM permissoes", Integer.class));
       assertEquals(
           0,
           j.queryForObject(

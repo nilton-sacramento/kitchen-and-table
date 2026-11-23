@@ -14,7 +14,7 @@ Guia da estrutura real. A aplicação segue Maven e Spring Boot; frontend e back
 | Tela operacional | src/main/resources/static/operacional.html | Identificação e desbloqueio operacional |
 | Interface e estilos | src/main/resources/static/assets/ | JavaScript nativo e CSS responsivo |
 | Ambiente | src/main/resources/application.yml | Variáveis externas e sessão |
-| Banco | src/main/resources/db/migration/ | Flyway V1–V14; preservar migrações existentes |
+| Banco | src/main/resources/db/migration/ | Flyway V1–V23 na feature2.8; preservar migrações existentes |
 | Testes Java | src/test/java/com/kitchentable/ | Segurança, integração e fixture Chrome |
 | Smoke | scripts/ | Controladores Node do smoke descartável |
 | Automação GitHub | .github/ | Workflow ativo, Dependabot, template de PR e template histórico de CI |
@@ -56,3 +56,7 @@ Backend de pedidos em src/main/java/com/kitchentable/pedidos; migrações V15/V1
 ## Entrega 2.7
 
 Caixa, pagamentos e relatórios nos pacotes Java caixa, pagamentos e relatorios; migrações novas V17–V19, V1–V16 preservadas. Frontend modular financeiro.js, financeiro-ui.js, caixa-operacional.js, conta.js, caixa-admin.js e relatorios.js na pasta existente de assets. Java em src/test/java/com/kitchentable/caixa; Node/Chrome em scripts/test-financeiro.mjs e scripts/smoke-caixa.mjs. [Entrega 2.7](entrega-2-7.md). Sem estrutura paralela ou dado privado versionado.
+
+## Entrega 2.8
+
+Backend de delivery/venda rápida em src/main/java/com/kitchentable/externos; frontend assets/externos.js e externo-contratos.js, integrado ao atendimento existente. Migrações novas V20–V23; testes Java Externo* no pacote caixa para reutilizar a fixture financeira real, Node test-externos.mjs e extensão Chrome smoke-externos.mjs. Sem cópia de backend, frontend ou ledger. Veja [contratos e limites](entrega-2-8.md).

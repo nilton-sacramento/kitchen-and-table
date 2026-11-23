@@ -4,6 +4,7 @@ import { orderTotal, createOrderIntent } from "./pedido-contratos.js";
 export async function renderPedidoEditor({
   c,
   original,
+  onReview,
   root,
   request,
   alive,
@@ -169,6 +170,7 @@ export async function renderPedidoEditor({
             versaoPedido: original.versao,
           }
         : data;
+      if (onReview) { void onReview({body,cart:structuredClone(cart),total:orderTotal(cart).toString()}); return; }
       const intent = createOrderIntent(body);
       const panel = el("div", "", "attendance-card pedido-review");
       panel.append(el("h3", "Confira antes de confirmar"));

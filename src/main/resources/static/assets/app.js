@@ -11,6 +11,8 @@ const modules = [
   ['comandas', 'Comandas', '▤', 'Consumo e acompanhamento de cada atendimento.'],
   ['pedidos', 'Pedidos', '≡', 'Pedidos e encaminhamento aos setores de produção.'],
   ['cozinha', 'Cozinha', '♧', 'Acompanhamento do preparo na cozinha.'],
+  ['delivery', 'Delivery', '↗', 'Pedidos externos registrados manualmente.'],
+  ['venda-rapida', 'Venda rápida', '↯', 'Balcão com pedido e pagamento no momento.'],
   ['bar', 'Bar', '♜', 'Acompanhamento dos itens preparados no bar.'],
   ['estoque', 'Estoque', '▧', 'Itens, movimentações e rastreabilidade de estoque.'],
   ['caixa', 'Caixa', '▣', 'Abertura, movimentações e fechamento do caixa.'],
@@ -143,9 +145,9 @@ function showPage(id, focus = true, historyMode = 'push') {
   $('page-phase').textContent = cash || reports ? 'ENTREGA 2.7' : mesas ? 'ENTREGA 2.4' : employees ? 'GESTÃO DA EQUIPE' : 'ACESSO INICIAL';
   if (module) {
     $('module-title').textContent = module[1];
-    $('module-description').textContent = ['comandas','pedidos','cozinha','bar'].includes(id) ? 'Disponível no acesso operacional com identificação e PIN. Utilize comandas para registrar pedidos ou as filas de cozinha e bar conforme suas permissões. Recebimentos e caixa estão disponíveis conforme as permissões individuais.' : module[3];
-    $('operational-link').hidden = !['comandas','pedidos','cozinha','bar'].includes(id);
-    $('module-unavailable').hidden = ['comandas','pedidos','cozinha','bar'].includes(id);
+    $('module-description').textContent = ['comandas','pedidos','cozinha','bar','delivery','venda-rapida'].includes(id) ? 'Disponível no acesso operacional com identificação e PIN. Utilize comandas para registrar pedidos ou as filas de cozinha e bar conforme suas permissões. Recebimentos e caixa estão disponíveis conforme as permissões individuais.' : module[3];
+    $('operational-link').hidden = !['comandas','pedidos','cozinha','bar','delivery','venda-rapida'].includes(id);
+    $('module-unavailable').hidden = ['comandas','pedidos','cozinha','bar','delivery','venda-rapida'].includes(id);
     $('module-symbol').textContent = module[2];
   }
   document.querySelectorAll('.nav-button').forEach((button) => {

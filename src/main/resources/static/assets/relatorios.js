@@ -157,6 +157,7 @@ export function createRelatorioScreen({
       ],
       ["Substituições na unidade", r.substituicoesNaUnidade],
     ]);
+    if(r.canais?.length){block.append(el('h4','Vendas liquidadas por canal'));for(const c of r.canais)pairs(block,[[c.canal==='DELIVERY'?'Delivery':c.canal==='VENDA_RAPIDA'?'Venda rápida':'Mesas e comandas',money(c.vendasLiquidadasCentavos)+' · '+c.quantidade+' atendimento(s)']]);}
     for (const m of r.meios) {
       block.append(el("h4", paymentNames[m.meio]));
       pairs(block, [
